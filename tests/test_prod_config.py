@@ -47,6 +47,8 @@ def test_async_mode_and_claim_settings(isolated_env, tmp_path):
 def test_gunicorn_transport_config(monkeypatch, tmp_path):
     conf = config.ROOT / "deploy/gunicorn.conf.py"
     monkeypatch.delenv("PORT", raising=False)
+    monkeypatch.delenv("BIND", raising=False)
+    monkeypatch.delenv("GUNICORN_TLS", raising=False)
     cert, key = tmp_path / "server.crt", tmp_path / "server.key"
     monkeypatch.setenv("CERT_FILE", str(cert))
     monkeypatch.setenv("KEY_FILE", str(key))
@@ -60,3 +62,8 @@ def test_gunicorn_transport_config(monkeypatch, tmp_path):
     settings = runpy.run_path(str(conf))
     assert settings["bind"] == "0.0.0.0:5098"
     assert (settings["certfile"], settings["keyfile"]) == (str(cert), str(key))
+    monkeypatch.setenv("BIND", "127.0.0.1:5000")
+    monkeypatch.setenv("GUNICORN_TLS", "0")
+    settings = runpy.run_path(str(conf))
+    assert settings["bind"] == "127.0.0.1:5000"
+    assert "certfile" not in settings and "keyfile" not in settings

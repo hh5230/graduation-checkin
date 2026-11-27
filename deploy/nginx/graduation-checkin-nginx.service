@@ -1,0 +1,17 @@
+[Unit]
+Description=Dedicated nginx for graduation-checkin (80/443 -> 127.0.0.1:5000)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/run/graduation-checkin-nginx.pid
+ExecStartPre=/usr/sbin/nginx -t -q -c /etc/graduation-checkin/nginx.conf
+ExecStart=/usr/sbin/nginx -c /etc/graduation-checkin/nginx.conf
+ExecReload=/usr/sbin/nginx -c /etc/graduation-checkin/nginx.conf -s reload
+ExecStop=/bin/kill -s QUIT $MAINPID
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

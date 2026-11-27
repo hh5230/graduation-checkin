@@ -1,4 +1,6 @@
-from flask import Blueprint, redirect, render_template, request, url_for
+from pathlib import Path
+
+from flask import Blueprint, abort, current_app, redirect, render_template, request, send_file, url_for
 
 from .auth import current_user, page_roles_required
 
@@ -26,6 +28,22 @@ def login():
     if current_user() is not None:
         return redirect(url_for("views.index"))
     return render_template("login.html")
+
+
+@bp.get("/claim")
+def claim():
+    return render_template("claim.html")
+
+
+@bp.get("/ca.crt")
+def ca_certificate():
+    path = current_app.config["CA_CERT_PATH"]
+    if not path or not Path(path).is_file():
+        abort(404)
+    response = send_file(Path(path).resolve(), mimetype="application/x-x509-ca-cert",
+                         as_attachment=True, download_name="graduation-ca.crt")
+    response.headers["Content-Disposition"] = 'attachment; filename="graduation-ca.crt"'
+    return response
 
 
 @bp.get("/admin")

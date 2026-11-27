@@ -4,9 +4,11 @@ from unittest.mock import patch
 import pytest
 from jinja2 import TemplateNotFound
 from redis.exceptions import ConnectionError
+from sqlalchemy import update
 
 from app.config import ROOT
-from app.extensions import get_redis
+from app.extensions import db, get_redis
+from app.models import Participant
 from tests import error, success
 
 CLAIM = "/api/public/claim"
@@ -49,6 +51,16 @@ def test_claim_matches_admin_png_without_side_effects(
     assert p["qr_token"] not in response.get_data(as_text=True)
     assert (participant_row(p["id"]), audit_for(p["id"])) == before
     assert socket_client.get_received() == []
+
+
+def test_claim_matches_mixed_case_stored_registration(app, client, make_participant):
+    p = make_participant()
+    with app.app_context(), db.engine.begin() as conn:
+        conn.execute(update(Participant).where(Participant.id == p["id"]).values(
+            participant_code="Grad01", email="Graduate@Example.ORG",
+        ))
+    data = success(client.post(CLAIM, json={"participant_code": "grad01", "email": "graduate@example.org"}))
+    assert data["participant"]["participant_code"] == "Grad01"
 
 
 @pytest.mark.parametrize("lang", ["zh", "en"])

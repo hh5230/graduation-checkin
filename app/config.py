@@ -22,6 +22,17 @@ class Config:
         self.SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", DEFAULT_DB)
         self.REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6380/0")
         self.STATS_CACHE_TTL = int(os.getenv("STATS_CACHE_TTL", "10"))
+        self.CLAIM_RATE_LIMIT = int(os.getenv("CLAIM_RATE_LIMIT", "10"))
+        self.CLAIM_RATE_WINDOW = int(os.getenv("CLAIM_RATE_WINDOW", "600"))
+        if self.CLAIM_RATE_LIMIT < 0 or self.CLAIM_RATE_WINDOW <= 0:
+            raise ValueError("CLAIM_RATE_LIMIT must be nonnegative and CLAIM_RATE_WINDOW positive")
+        self.SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "").strip().lower() in {"1", "true", "yes"}
+        self.TRUST_PROXY = os.getenv("TRUST_PROXY", "").strip().lower() in {"1", "true", "yes"}
+        self.PROXY_HOPS = int(os.getenv("PROXY_HOPS", "1"))
+        self.PREFERRED_URL_SCHEME = "https" if self.SESSION_COOKIE_SECURE else "http"
+        self.SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "threading")
+        cert_dir = "certs" if ROOT == Path("/opt/graduation-checkin") else "deploy"
+        self.CA_CERT_PATH = os.getenv("CA_CERT_PATH", str(ROOT / cert_dir / "ca.crt"))
         self.HOST = os.getenv("HOST", "0.0.0.0")
         self.PORT = int(os.getenv("PORT", "5001"))
 
@@ -31,6 +42,9 @@ class TestConfig(Config):
 
     def __init__(self):
         super().__init__()
+        self.SESSION_COOKIE_SECURE = False
+        self.PREFERRED_URL_SCHEME = "http"
+        self.SOCKETIO_ASYNC_MODE = "threading"
         self.SQLALCHEMY_DATABASE_URI = os.getenv("TEST_DATABASE_URL", DEFAULT_DB + "_test")
         # Keep the same cache key in both environments without mixing their counts.
         url = urlsplit(self.REDIS_URL)

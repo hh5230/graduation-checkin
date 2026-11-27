@@ -9,10 +9,10 @@ def success(data, status=200):
 
 
 def json_body(*, optional=False, allowed=None):
-    if optional and not request.get_data() and (request.is_json or not request.content_type):
-        return {}
-    if not request.is_json:
+    if request.mimetype != "application/json":
         raise ApiError("UNSUPPORTED_MEDIA_TYPE", 415)
+    if optional and not request.get_data():
+        return {}
     try:
         body = request.get_json()
     except BadRequest:

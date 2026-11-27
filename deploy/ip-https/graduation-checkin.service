@@ -1,0 +1,23 @@
+# Fallback unit (IP + self-signed CA, e.g. https://36.138.220.233:5000): gunicorn serves TLS itself.
+[Unit]
+Description=Graduation check-in HTTPS and Socket.IO server
+After=network-online.target graduation-checkin-redis.service
+Wants=network-online.target graduation-checkin-redis.service
+
+[Service]
+User=grad-checkin
+Group=grad-checkin
+WorkingDirectory=/opt/graduation-checkin
+Environment=CERT_FILE=/opt/graduation-checkin/certs/server.crt KEY_FILE=/opt/graduation-checkin/certs/server.key
+EnvironmentFile=/opt/graduation-checkin/.env
+ExecStartPre=/usr/bin/test -s ${CERT_FILE}
+ExecStartPre=/usr/bin/test -s ${KEY_FILE}
+ExecStart=/opt/graduation-checkin/.venv/bin/gunicorn -c deploy/gunicorn.conf.py wsgi:app
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

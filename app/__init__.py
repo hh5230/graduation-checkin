@@ -3,6 +3,7 @@ import sys
 
 from flask import Flask
 from socketio import Manager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import Config, TestConfig
 from .extensions import db, socketio
@@ -16,20 +17,31 @@ def create_app(config_name: str | None = None):
     db.init_app(app)
 
     from . import realtime, views
-    from .api import auth, checkin, participants, stage, stats
+    from .api import auth, checkin, participants, public, stage, stats
     from .errors import register_error_handlers
 
-    for blueprint in (auth.bp, participants.bp, checkin.bp, stage.bp, stats.bp, views.bp):
+    for blueprint in (auth.bp, participants.bp, checkin.bp, public.bp, stage.bp, stats.bp, views.bp):
         app.register_blueprint(blueprint)
     register_error_handlers(app)
 
     # The in-process test client needs a local Manager even after a production factory call.
     if app.testing:
-        socketio.init_app(app, message_queue=None, client_manager=Manager(),
-                          async_mode="threading", cors_allowed_origins=None)
+        options = {"message_queue": None, "client_manager": Manager()}
     else:
-        socketio.init_app(app, message_queue=app.config["REDIS_URL"],
-                          async_mode="threading", cors_allowed_origins=None)
+        options = {"message_queue": app.config["REDIS_URL"]}
+    proxy = None
+    if app.config["TRUST_PROXY"]:
+        hops = app.config["PROXY_HOPS"]
+        proxy = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+        app.wsgi_app = proxy
+    socketio.init_app(app, async_mode=app.config["SOCKETIO_ASYNC_MODE"], cors_allowed_origins=None, **options)
+    if proxy is not None:
+        # init_app puts its dispatcher ahead of the Flask fallback. Move it
+        # inside ProxyFix so polling and WebSocket requests see the same environ.
+        dispatcher = app.wsgi_app
+        dispatcher.wsgi_app = proxy.app
+        proxy.app = dispatcher
+        app.wsgi_app = proxy
 
     @app.cli.command("init-db")
     def init_db_command():

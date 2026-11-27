@@ -8,6 +8,8 @@ messages = {
     "UNSUPPORTED_MEDIA_TYPE": {"zh": "请使用 JSON 格式提交。", "en": "Please submit the request as JSON."},
     "NOT_FOUND": {"zh": "找不到请求的资源。", "en": "The requested resource was not found."},
     "PARTICIPANT_NOT_FOUND": {"zh": "找不到该编号对应的参与者。", "en": "No participant has that code."},
+    "CLAIM_NOT_FOUND": {"zh": "参与者编号与登记邮箱不匹配。", "en": "The participant code and registered email do not match."},
+    "RATE_LIMITED": {"zh": "领取请求过于频繁，请稍后重试。", "en": "Too many claim attempts. Please try again later."},
     "INVALID_QR": {"zh": "二维码无效或已失效。", "en": "This QR code is invalid or has expired."},
     "DUPLICATE_CODE": {"zh": "参与者编号已被使用。", "en": "This participant code is already in use."},
     "DUPLICATE_EMAIL": {"zh": "邮箱已被使用。", "en": "This email address is already in use."},
