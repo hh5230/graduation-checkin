@@ -159,6 +159,8 @@ Socket.IO 事件：`participant_updated`、`stage_updated`、`stats_updated`（�
 
 ## 6. 测试方法
 
+> **完整功能测试用例（72 条，含安卓手机扫码）：[docs/test-cases.pdf](docs/test-cases.pdf)**，可直接按用例逐项测试。
+
 _（最终验收后补充实际结果）_
 
 ```bash
