@@ -27,6 +27,7 @@
 | F19 | 独立全屏舞台显示页 | `/display` | staff/admin 登录的大屏 |
 | F20 | 切换后自动更新 | Socket.IO `stage_updated` 事件 | — |
 | F21 | Dashboard 六项统计 | `/dashboard` + `GET /api/stats` + Socket.IO `stats_updated` | staff/admin |
+| F22 | 学生通过落地页领取自己的二维码（补充需求） | 公开页 `/claim` + `POST /api/public/claim` | 公开（凭编号+邮箱） |
 | T1 | 中英文切换 | 前端 `static/i18n/{zh,en}.json` + 后端错误文案 zh/en | — |
 
 ## 2. 技术栈与目录
@@ -194,6 +195,37 @@ registered --check_in--> checked_in --enqueue--> queued --call_next--> on_stage 
 - `total` = 全部参与者；`not_checked_in` = status='registered'；`checked_in` = status ∈ {checked_in, queued, on_stage, completed}（曾签到即计入）；`waiting` = queued；`on_stage`；`completed`。恒等式：`checked_in + not_checked_in = total`。
 
 QR 扫描结果解析：二维码内容为 `GRAD:<token>`；前端扫描后去掉 `GRAD:` 前缀再作为 `token` 发送；后端也接受带前缀的 token（自动剥离）。不符合 `^[A-Za-z0-9_-]{16,64}$` 的 token → `INVALID_QR`。
+
+## 8.5 补充需求：学生自助领取二维码（F22）
+
+- 页面 `GET /claim`：**公开**（无需登录），移动优先，中英文切换。学生输入「参与者编号 + 登记邮箱」，两者同时匹配才显示自己的二维码（大图）、姓名、编号、当前状态，提供「下载 PNG」按钮和使用说明（入场时出示给工作人员扫码）。`/login` 页加一个「学生领取二维码」入口链接。
+- 接口 `POST /api/public/claim`（公开，JSON）：请求 `{participant_code, email}`；code 去空格转大写、email 去空格转小写后**同时匹配**。
+  - 成功 `data`：`{participant: {participant_code, name, status}, qr_png_base64: "<PNG 的 base64>", qr_filename: "QR-<code>.png"}`。二维码内容与管理端一致（`GRAD:<token>`），复用 `services/qr.py`。不返回 email、id、token 明文、审计信息。
+  - 失败：参数缺失/格式错 → `400 VALIDATION_ERROR`；不匹配（编号不存在或邮箱不符，**统一同一个错误，不区分**，防止枚举）→ `404 CLAIM_NOT_FOUND`；频率超限 → `429 RATE_LIMITED`（details: `retry_after` 秒）。
+  - 限流（Redis）：按客户端 IP，key `ratelimit:claim:<ip>`，INCR + EXPIRE，**10 分钟内最多 10 次**（成功失败都计数）；Redis 不可用时放行（记 warning）。
+  - 不修改任何业务状态，不广播；写一条应用日志即可（不写 audit_logs，因为 action CHECK 约束不含该动作，且不改 schema）。
+- 安全说明：这是「所有 API 需登录」规则的唯一例外，由补充需求要求；以「编号+邮箱」双因子匹配 + 统一错误 + IP 限流 + 不回传 token 明文来降低风险。
+- 错误码表新增：`CLAIM_NOT_FOUND`(404)、`RATE_LIMITED`(429)，zh/en 文案同时加入后端 `i18n.py` 与前端 `error.<CODE>`。
+
+## 8.6 Dashboard 签到时间分布（柱状图数据，配合视觉规范 §13）
+
+`GET /api/stats/timeline`（staff/admin）query：`bucket_minutes`（默认 30，允许 5–120）、`buckets`（默认 8，1–48）。按 `checked_in_at` 统计最近 N 个时间段的签到人数，最后一段包含当前时刻。
+data：`{"bucket_minutes": 30, "buckets": [{"start": ISO, "end": ISO, "count": 3, "current": false}, ...]}`（按时间升序，最后一个 `current: true`）。参数非法 → `400 VALIDATION_ERROR`。
+
+## 8.7 生产部署相关接口
+
+- `GET /ca.crt`（公开）：若配置了 `CA_CERT_PATH` 且文件存在，返回该根证书（`application/x-x509-ca-cert`），供手机首次安装信任；否则 404。
+- 生产以 HTTPS 运行（自签名根 CA 签发的 IP 证书），`SESSION_COOKIE_SECURE=1`。
+
+## 13. 前端视觉规范
+
+- 设计稿 `docs/design-reference.png`；设计 Tokens 在 `app/static/css/tokens.css`（架构师维护，实现方只读）。所有颜色、圆角、阴影、间距必须引用 tokens 变量。
+- 布局：左侧固定侧边栏（Logo、图标+文字导航、当前项深紫底白字、数量角标浅紫、"设置/账户"类与其他导航以分隔线隔开）+ 顶部栏（居中圆角搜索框带图标与快捷键提示、右侧通知图标、头像、姓名+角色、中英文切换）+ 页面标题区（大号问候语/标题、灰色副标题、右侧日期或下拉）+ 统计卡片行 + 内容卡片。
+- 状态胶囊颜色固定：registered 灰、checked_in 紫、queued 橙、on_stage 深紫、completed 绿。
+- 分段筛选按钮同设计稿 "All (12) / Hot / Warm / New"，选中项深紫底。
+- 柱状图：紫色系，当前时段深紫，其余浅紫（数据来自 §8.6）。
+- 响应式：≤768px 侧边栏变为底部标签栏（主要页面）+ 汉堡菜单（其余），卡片单列；扫码页大按钮单手操作。
+- 图标：内联 SVG（Lucide 线性图标），不依赖外部 CDN；第三方 JS 使用 `app/static/vendor/` 本地文件（html5-qrcode、socket.io），以适配国内网络。
 
 ## 9. 实时同步（Socket.IO，默认 namespace `/`）
 
