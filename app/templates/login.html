@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set page = 'login' %}
+{% set title_key = 'login.title' %}
+{% block title %}工作台登录{% endblock %}
+{% block content %}
+<div class="login-layout">
+  <section class="panel login-panel" aria-labelledby="login-title">
+    <h1 id="login-title" data-i18n="login.title">工作台登录</h1>
+    <form id="login-form" class="form-stack" action="/api/auth/login" method="post">
+      <label>{{ tr('auth.username', '用户名') }}<input name="username" autocomplete="username" required maxlength="64" autofocus></label>
+      <label>{{ tr('auth.password', '密码') }}<input type="password" name="password" autocomplete="current-password" required></label>
+      <div class="banner" id="login-notice" role="alert" hidden></div>
+      <button class="button primary" data-i18n="auth.login">登录</button>
+    </form>
+    <a class="claim-link" href="/claim" data-i18n="login.claim">学生领取二维码</a>
+  </section>
+  <aside class="demo-ticket" aria-labelledby="demo-title">
+    <div class="ticket-art" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="ticket-body">
+      <h2 id="demo-title" data-i18n="login.demo">演示账号</h2>
+      <table class="demo-table">
+        <thead><tr><th data-i18n="auth.username">用户名</th><th data-i18n="auth.password">密码</th></tr></thead>
+        <tbody>{% for user, password in [('admin','admin123'),('staff1','staff123'),('staff2','staff123')] %}
+          <tr><td>{{ user }}</td><td>{{ password }}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+  </aside>
+</div>
+{% endblock %}

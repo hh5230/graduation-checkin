@@ -1,0 +1,81 @@
+{% macro tr(key, fallback) -%}<span data-i18n="{{ key }}">{{ fallback }}</span>{%- endmacro %}
+{% macro brand() -%}
+<a href="/" class="brand"><span class="brand-mark" aria-hidden="true"><i></i></span>{{ tr('app.name', '毕业典礼') }}</a>
+{%- endmacro %}
+{% macro languages() -%}
+<div class="languages" role="group" data-i18n-aria="lang.label" aria-label="语言">
+  <button type="button" data-lang="zh" lang="zh" data-i18n="lang.zh">中文</button><span aria-hidden="true">/</span>
+  <button type="button" data-lang="en" lang="en" data-i18n="lang.en">EN</button>
+</div>
+{%- endmacro %}
+{% macro connection() -%}
+<span class="connection" id="conn-status" role="status" data-i18n="connection.offline">离线</span>
+{%- endmacro %}
+{% macro socket_scripts() -%}
+<script async id="socket-client" src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script defer src="{{ url_for('static', filename='js/realtime.js') }}"></script>
+{%- endmacro %}
+{% macro scanner_scripts() -%}
+<script async src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script defer src="{{ url_for('static', filename='js/scanner.js') }}"></script>
+{%- endmacro %}
+{% macro scan_panel(submit_key, submit_text) -%}
+<section class="panel scan-panel" aria-labelledby="scan-title">
+  <h2 id="scan-title" data-i18n="scan.title">扫描二维码</h2>
+  <div class="camera-frame" id="camera-frame">
+    <div class="camera-placeholder" aria-hidden="true"><i class="viewfinder"></i></div>
+    <div id="reader"></div>
+  </div>
+  <button type="button" class="button camera-button" id="camera-toggle" data-i18n="scan.start">启动摄像头</button>
+  <div class="banner" id="camera-notice" role="status" hidden></div>
+  <form id="manual-form" class="manual-form">
+    <label for="manual-code" data-i18n="scan.manual">手动输入参与者编号</label>
+    <div class="input-action">
+      <input id="manual-code" name="code" required autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="field.codeExample" placeholder="G2026001">
+      <button class="button primary" data-i18n="{{ submit_key }}">{{ submit_text }}</button>
+    </div>
+  </form>
+</section>
+{%- endmacro %}
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="{{ title_key|default('app.name') }}">{% block title %}毕业典礼{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script defer src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/api.js') }}"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell topbar">
+      {{ brand() }}
+      <div class="header-tools">
+        {{ languages() }}
+        {% if current_user %}
+        <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
+        <button type="button" class="text-button" id="logout" data-i18n="auth.logout">退出</button>
+        {% endif %}
+      </div>
+    </div>
+    {% if current_user %}
+    <nav class="site-nav" data-i18n-aria="nav.label" aria-label="主导航">
+      <div class="shell nav-links">
+      {% for slug, name in [('admin','参与者管理'),('entry','入场签到'),('stage','舞台调度'),('display','舞台大屏'),('dashboard','数据总览')] %}
+        {% if slug != 'admin' or current_user.role == 'admin' %}
+        <a href="/{{ slug }}"{% if page|default('') == slug %} aria-current="page"{% endif %} data-i18n="nav.{{ slug }}">{{ name }}</a>
+        {% endif %}
+      {% endfor %}
+      </div>
+    </nav>
+    {% endif %}
+  </header>
+  <main class="shell main-content" id="main">
+    <div id="global-notice" class="banner" role="alert" hidden></div>
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

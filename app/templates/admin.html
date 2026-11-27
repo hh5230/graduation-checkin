@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% set page = 'admin' %}
+{% set title_key = 'nav.admin' %}
+{% block title %}参与者管理{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div class="heading-with-status"><h1 data-i18n="nav.admin">参与者管理</h1>{{ connection() }}</div>
+  <button class="button primary" type="button" id="create-person"><span aria-hidden="true">＋</span>{{ tr('admin.create', '新增参与者') }}</button>
+</div>
+<div class="banner" id="admin-notice" role="status" hidden></div>
+<div class="banner" id="list-notice" role="alert" hidden></div>
+<section class="panel register" data-i18n-aria="admin.roster" aria-label="参与者名册">
+  <div class="filters">
+    <label class="search-label">{{ tr('admin.search', '搜索参与者') }}
+      <input type="search" id="search" autocomplete="off" data-i18n-placeholder="admin.searchHint" placeholder="输入姓名、邮箱或编号">
+    </label>
+    <label>{{ tr('field.status', '状态') }}
+      <select id="status-filter">
+        <option value="" data-i18n="admin.all">全部状态</option>
+        {% for value, label in [('registered','已登记'),('checked_in','已签到'),('queued','排队中'),('on_stage','台上'),('completed','已完成')] %}
+        <option value="{{ value }}" data-i18n="status.{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <table class="roster">
+    <thead><tr>
+      {% for key, label in [('field.code','编号'),('field.name','姓名'),('field.email','邮箱'),('field.status','状态'),('field.checkin','签到记录'),('field.queued','入队时间'),('field.called','呼叫时间'),('field.completed','完成时间'),('common.actions','操作')] %}
+      <th scope="col" data-i18n="{{ key }}">{{ label }}</th>
+      {% endfor %}
+    </tr></thead>
+    <tbody id="participant-rows"></tbody>
+  </table>
+  <p class="empty" id="list-empty" role="status" data-i18n="common.loading">正在加载…</p>
+  <div class="pagination">
+    <span id="page-info" aria-live="polite"></span>
+    <div class="actions">
+      <button type="button" class="button" id="prev-page" disabled data-i18n="admin.prev">上一页</button>
+      <button type="button" class="button" id="next-page" disabled data-i18n="admin.next">下一页</button>
+    </div>
+  </div>
+</section>
+<dialog id="editor" aria-labelledby="editor-title">
+  <form id="editor-form" class="form-stack">
+    <h2 id="editor-title" data-i18n="admin.create">新增参与者</h2>
+    <label>{{ tr('field.code', '编号') }}<input required maxlength="32" name="participant_code" autocomplete="off"></label>
+    <label>{{ tr('field.name', '姓名') }}<input required maxlength="128" name="name" autocomplete="off"></label>
+    <label>{{ tr('field.email', '邮箱') }}<input required maxlength="255" type="email" name="email" autocomplete="off"></label>
+    <div class="banner" id="editor-notice" role="alert" hidden></div>
+    <div class="actions">
+      <button class="button primary" type="submit" data-i18n="common.save">保存</button>
+      <button class="button" type="button" data-close data-i18n="common.cancel">取消</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="qr-dialog" aria-labelledby="qr-title">
+  <div class="qr-ticket">
+    <div class="qr-heading"><span class="brand-mark" aria-hidden="true"><i></i></span><h2 id="qr-title" data-i18n="admin.pass">参与者通行证</h2></div>
+    <img id="qr-image" width="240" height="240" alt="参与者二维码" data-i18n-alt="admin.qrImage">
+    <strong id="qr-name"></strong><span class="mono" id="qr-code"></span>
+  </div>
+  <div class="banner" role="alert" id="qr-notice" hidden></div>
+  <div class="actions qr-actions" id="qr-actions">
+    <button class="button primary" id="print-qr" data-i18n="admin.print">打印</button>
+    <a class="button" id="download-qr" download data-i18n="admin.download">下载</a>
+    <button class="text-button" id="ask-regenerate" data-i18n="admin.regenerate">重新生成二维码</button>
+    <button class="text-button" data-close data-i18n="common.close">关闭</button>
+  </div>
+  <section class="qr-confirm" id="qr-confirm" hidden aria-labelledby="regen-title">
+    <h3 id="regen-title" data-i18n="admin.regenTitle">替换此二维码？</h3>
+    <p data-i18n="admin.regenHint">重新生成后，原有二维码将立即失效。</p>
+    <div class="actions">
+      <button class="button danger" id="regenerate" data-i18n="admin.regenerate">重新生成二维码</button>
+      <button class="button" id="keep-qr" data-i18n="common.cancel">取消</button>
+    </div>
+  </section>
+</dialog>
+{% endblock %}
+{% block scripts %}{{ socket_scripts() }}
+<script defer src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

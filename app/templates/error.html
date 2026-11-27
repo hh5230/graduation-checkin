@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% set page = 'error' %}
+{% set title_key = 'error.title' %}
+{% block title %}页面错误{% endblock %}
+{% block content %}
+<section class="panel error-panel">
+  <h1>{{ status_code }}</h1>
+  <p{% if error_code %} data-i18n="error.{{ error_code }}"{% endif %}>{{ message }}</p>
+  <a class="button primary" href="/" data-i18n="common.home">返回首页</a>
+</section>
+{% endblock %}

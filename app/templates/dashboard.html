@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set page = 'dashboard' %}
+{% set title_key = 'nav.dashboard' %}
+{% block title %}数据总览{% endblock %}
+{% block content %}
+<div class="page-heading"><h1 data-i18n="nav.dashboard">数据总览</h1>{{ connection() }}</div>
+<div class="banner" id="state-notice" role="alert" hidden></div>
+<section class="rate-panel" aria-labelledby="rate-heading">
+  <div class="rate-heading"><h2 id="rate-heading" data-i18n="stats.rate">签到率</h2><strong id="rate-value" class="rate-value">—</strong></div>
+  <progress id="rate-bar" max="100" aria-labelledby="rate-heading"></progress>
+</section>
+<div class="stats-grid">
+  {% for field, label in [('total','参与者总数'),('checked_in','已签到人数'),('not_checked_in','未签到人数'),('waiting','排队人数'),('on_stage','台上人数'),('completed','已完成人数')] %}
+  <section class="panel stat-card stat-{{ field }}">
+    <h2 data-i18n="stats.{{ field }}">{{ label }}</h2>
+    <strong id="stat-{{ field }}">—</strong>
+  </section>
+  {% endfor %}
+</div>
+<p class="updated">{{ tr('stats.updated', '最后更新') }} <time id="stats-time">—</time></p>
+{% endblock %}
+{% block scripts %}{{ socket_scripts() }}
+<script defer src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
