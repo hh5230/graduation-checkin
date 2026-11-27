@@ -21,13 +21,10 @@
     const card = byId('stage-current');
     card.textContent = '';
     if (!state) {
-      card.append(element('p', 'empty', I18N.t('common.loading')));
+      card.append(element('li', 'empty', I18N.t('common.loading')));
       return;
     }
-    if (state.current) {
-      card.append(element('strong', 'feature-name', state.current.name),
-        element('span', 'mono feature-code', state.current.participant_code));
-    } else card.append(element('p', 'empty', I18N.t('stage.idle')));
+    personList(card, state.current ? [state.current] : [], 'called_at', 'stage.idle');
     personList(byId('stage-queue'), state.queue, 'queued_at', 'stage.emptyQueue', true);
     personList(byId('stage-recent'), state.recent_completed, 'completed_at', 'stage.emptyRecent');
   }

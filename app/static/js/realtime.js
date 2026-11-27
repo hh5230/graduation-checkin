@@ -1,42 +1,38 @@
 (() => {
   'use strict';
 
+  // The shell and the current page subscribe to one authenticated, same-origin socket.
+  let socket;
   function connect({ onParticipant, onStage, onStats, onConnect } = {}) {
-    const indicator = UI.byId('conn-status');
-    function mark(online) {
-      if (!indicator) return;
-      indicator.dataset.online = String(online);
-      indicator.dataset.i18n = online ? 'connection.online' : 'connection.offline';
-      indicator.textContent = I18N.t(indicator.dataset.i18n);
-    }
-    function attach() {
-      if (!window.io) return;
-      const socket = window.io({ autoConnect: false });
-      if (onParticipant) socket.on('participant_updated', onParticipant);
-      if (onStage) socket.on('stage_updated', onStage);
-      if (onStats) socket.on('stats_updated', onStats);
-      socket.on('connect', () => {
-        mark(true);
-        if (onConnect) onConnect();
-      });
+    if (!window.io) return;
+    if (!socket) {
+      socket = io();
+      const indicator = UI.byId('conn-status');
+      function mark(online) {
+        if (!indicator) return;
+        indicator.dataset.online = String(online);
+        indicator.dataset.i18n = online ? 'connection.online' : 'connection.offline';
+        indicator.textContent = I18N.t(indicator.dataset.i18n);
+      }
+      socket.on('connect', () => mark(true));
       socket.on('disconnect', () => mark(false));
       socket.on('connect_error', () => mark(false));
-      socket.connect();
     }
-    mark(false);
-    if (window.io) attach();
-    else {
-      const script = UI.byId('socket-client');
-      if (script) script.addEventListener('load', attach, { once: true });
+    if (onParticipant) socket.on('participant_updated', onParticipant);
+    if (onStage) socket.on('stage_updated', onStage);
+    if (onStats) socket.on('stats_updated', onStats);
+    if (onConnect) {
+      socket.on('connect', onConnect);
+      if (socket.connected) onConnect();
     }
   }
 
-  // A broadcast received during a REST read supersedes that read's snapshot.
-  function snapshot(path, render) {
+  // Discard an older HTTP snapshot when a newer read or broadcast has arrived.
+  function snapshot(path, render, noticeId = 'state-notice') {
     let revision = 0;
     function accept(data) {
       ++revision;
-      UI.notice('state-notice');
+      UI.notice(noticeId);
       render(data);
     }
     async function refresh() {
@@ -45,7 +41,7 @@
         const data = await API.get(path);
         if (ticket === revision) accept(data);
       } catch (error) {
-        if (ticket === revision) UI.showError('state-notice', error);
+        if (ticket === revision) UI.showError(noticeId, error);
       }
     }
     return { accept, refresh };

@@ -55,3 +55,24 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ix_audit_logs_participant ON audit_logs (participant_id, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Migration v2 (operator-centric workflow). Idempotent; safe on existing DBs.
+-- ---------------------------------------------------------------------------
+-- Roles: admin (PC), checkin (entrance phone), stage (backstage/stage phone or tablet),
+-- viewer (organizer: dashboard + display only). 'staff' kept = checkin + stage.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check
+    CHECK (role IN ('admin', 'staff', 'checkin', 'stage', 'viewer'));
+
+-- Which entrance/counter performed the check-in (free text chosen on the device, e.g. "东门 A").
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS checked_in_entrance VARCHAR(64);
+-- How many times a called participant was sent back to the end of the queue.
+ALTER TABLE participants ADD COLUMN IF NOT EXISTS requeue_count INTEGER NOT NULL DEFAULT 0;
+
+-- New audit actions: requeue (absent when called -> back to queue tail),
+-- undo (admin reverts the last transition; details.reason mandatory), import (CSV).
+ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_action_check;
+ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_action_check
+    CHECK (action IN ('create', 'update', 'check_in', 'enqueue', 'call', 'complete',
+                      'regenerate_qr', 'requeue', 'undo', 'import'));

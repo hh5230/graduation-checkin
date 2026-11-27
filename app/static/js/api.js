@@ -66,7 +66,9 @@
   }
 
   function badge(status) {
-    return element('span', 'badge badge-' + status, I18N.t('status.' + status));
+    const chip = element('span', 'badge badge-' + status, I18N.t('status.' + status));
+    chip.dataset.i18n = 'status.' + status;
+    return chip;
   }
 
   const notices = new Map();
@@ -93,25 +95,96 @@
   }
   function showError(id, error) { notice(id, 'error', () => errorText(error)); }
 
-  // Queue and history panels share the participant identity and a local timestamp.
-  function personList(node, items, timeField, emptyKey, numbered = false) {
-    node.textContent = '';
-    if (!items.length) {
-      node.append(element('li', 'empty', I18N.t(emptyKey)));
-      return;
-    }
-    items.forEach((person, index) => {
-      const row = element('li', 'person-row');
-      if (numbered) row.append(element('span', 'position', String(index + 1).padStart(2, '0')));
-      const who = element('div', 'person-who');
-      who.append(element('strong', '', person.name), element('span', 'mono', person.participant_code));
-      const time = element('time', 'row-time', formatTime(person[timeField]));
-      if (person[timeField]) time.dateTime = person[timeField];
-      row.append(who, time);
-      node.append(row);
-    });
+  const iconPaths = {
+    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>',
+    edit: '<path d="m15 5 4 4M4 20l4-1L21 6l-4-4L4 15z"/>',
+    qr: '<path d="M3 3h6v6H3zm12 0h6v6h-6zM3 15h6v6H3zm12 0h2v3h4v3h-6z"/>'
+  };
+  function icon(key) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const [attr, value] of Object.entries({ class: 'icon', viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(attr, value);
+    svg.innerHTML = iconPaths[key];
+    return svg;
   }
-  window.UI = { byId, element, badge, notice, showError, errorText, personList };
+
+  function initials(name) {
+    const words = String(name || '').trim().split(/\s+/);
+    return (words.length > 1 ? words[0][0] + words[words.length - 1][0] : [...words[0]].slice(0, 2).join('')).toLocaleUpperCase();
+  }
+
+  function showDetails(person) {
+    const body = byId('detail-person');
+    const label = element('strong', 'feature-name', person.name);
+    const fields = element('dl', 'details');
+    const add = (key, value) => {
+      const term = element('dt', '', I18N.t(key));
+      term.dataset.i18n = key;
+      fields.append(term, element('dd', '', value));
+    };
+    add('field.code', person.participant_code);
+    if (person.email) add('field.email', person.email);
+    for (const [prefix, key] of [['checked_in','checkin'], ['queued','queued'], ['called','called'], ['completed','completed']]) {
+      if (!(prefix + '_at' in person)) continue;
+      const operator = person[prefix + '_by']?.name;
+      add('field.' + key, [formatTime(person[prefix + '_at']), operator].filter(Boolean).join(' · '));
+    }
+    body.replaceChildren(label, badge(person.status || 'checked_in'), fields);
+    byId('participant-detail').showModal();
+  }
+
+  function personRow(person, { timeField, position, actions = [], email = false } = {}) {
+    const row = element('li', 'person-row');
+    if (person.status === 'on_stage') row.classList.add('highlight');
+    if (position) row.append(element('span', 'position', String(position).padStart(2, '0')));
+    row.append(element('span', 'avatar', initials(person.name)));
+    const who = element('div', 'person-who');
+    who.append(element('strong', '', person.name), element('span', 'secondary',
+      email ? [person.participant_code, person.email].join(' · ') : person.participant_code));
+    row.append(who);
+    if (timeField && person[timeField]) {
+      const time = element('time', 'row-time', formatTime(person[timeField]));
+      time.dateTime = person[timeField];
+      row.append(time);
+    }
+    row.append(badge(person.status || 'checked_in'));
+    const menu = element('details', 'row-menu');
+    const trigger = element('summary', 'icon-button');
+    trigger.setAttribute('aria-label', I18N.t('common.actions') + ' · ' + person.name);
+    trigger.append(icon('more'));
+    const pop = element('div', 'pop-panel');
+    for (const [key, glyph, handler] of [['common.details', 'info', showDetails], ...actions]) {
+      const button = element('button', 'menu-action');
+      button.type = 'button';
+      button.append(icon(glyph), document.createTextNode(I18N.t(key)));
+      button.addEventListener('click', () => { menu.open = false; handler(person); });
+      pop.append(button);
+    }
+    menu.append(trigger, pop);
+    row.append(menu);
+    return row;
+  }
+
+  document.addEventListener('click', event => {
+    for (const menu of document.querySelectorAll('.row-menu[open]')) {
+      if (!menu.contains(event.target)) menu.open = false;
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') document.querySelectorAll('.row-menu[open]').forEach(menu => {
+      menu.open = false;
+      menu.querySelector('summary').focus();
+    });
+  });
+
+  function personList(node, items, timeField, emptyKey, numbered = false) {
+    node.replaceChildren();
+    if (!items.length) node.append(element('li', 'empty', I18N.t(emptyKey)));
+    items.forEach((person, index) => node.append(personRow(person, { timeField, position: numbered && index + 1 })));
+  }
+  window.UI = { byId, element, badge, notice, showError, errorText, initials, personList, personRow };
 
   const logout = byId('logout');
   if (logout) logout.addEventListener('click', async () => {
@@ -119,7 +192,8 @@
     try {
       await API.post('/api/auth/logout', {});
       try {
-        Object.keys(sessionStorage).filter(key => key.startsWith('graduation.checkins.'))
+        Object.keys(sessionStorage).filter(key =>
+          key.startsWith('graduation.checkins.') || key.startsWith('graduation.notifications.'))
           .forEach(key => sessionStorage.removeItem(key));
       } catch (_) { /* Storage can be disabled. */ }
       location.assign('/login');

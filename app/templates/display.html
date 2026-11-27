@@ -1,4 +1,4 @@
-{% from "base.html" import languages, socket_scripts, connection with context %}
+{% from "_ui.html" import languages, socket_scripts, connection, brand %}
 <!doctype html>
 <html lang="zh">
 <head>
@@ -15,7 +15,7 @@
 <body class="display-body">
   <main class="display-layout">
     <header class="display-header">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i></span><span data-i18n="app.name">毕业典礼</span></div>
+      {{ brand() }}
       <div class="display-tools" id="display-tools">
         {{ languages() }}
         <button class="button" id="fullscreen" data-i18n="display.fullscreen">全屏</button>

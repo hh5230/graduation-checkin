@@ -1,29 +1,120 @@
 (() => {
   'use strict';
 
-  const { byId } = UI;
-  let stats = null;
-  let updated = null;
-  function render() {
-    if (!stats) return;
-    const locale = I18N.getLang();
-    const count = new Intl.NumberFormat(locale);
-    for (const field of ['total', 'checked_in', 'not_checked_in', 'waiting', 'on_stage', 'completed']) {
-      byId('stat-' + field).textContent = count.format(stats[field]);
+  const { byId, element, personList } = UI;
+  const admin = document.body.dataset.role === 'admin';
+  const interval = byId('chart-interval');
+  let timeline = null;
+  let stage = null;
+  let recent = [];
+  let timelineVersion = 0;
+  let rosterVersion = 0;
+  let timer;
+
+  function renderChart() {
+    if (!timeline) return;
+    const buckets = timeline.buckets;
+    const total = buckets.reduce((sum, b) => sum + b.count, 0);
+    byId('chart-total').textContent = total.toLocaleString(I18N.getLang());
+    const max = Math.max(2, ...buckets.map(b => b.count));
+    const step = Math.ceil(max / 2);
+    const clock = new Intl.DateTimeFormat(I18N.getLang(), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    const chart = byId('timeline');
+    const axis = element('div', 'chart-axis');
+    const plot = element('div', 'chart-plot');
+    const labels = element('div', 'chart-labels');
+    for (const n of [step * 2, step, 0]) axis.append(element('span', '', n));
+    for (const b of buckets) {
+      const start = clock.format(new Date(b.start));
+      const end = clock.format(new Date(b.end));
+      const tip = I18N.t('dashboard.bucket', { start, end, count: b.count });
+      const slot = element('div', 'chart-slot');
+      slot.tabIndex = 0;
+      slot.setAttribute('aria-label', tip);
+      slot.title = tip;
+      const bar = element('div', 'chart-bar' + (b.current ? ' current' : ''));
+      bar.style.height = (100 * b.count / (2 * step)) + '%';
+      const tooltip = element('span', 'chart-tooltip', tip);
+      tooltip.setAttribute('aria-hidden', 'true');
+      slot.append(bar, tooltip);
+      plot.append(slot);
+      labels.append(element('span', '', start));
     }
-    const fraction = stats.total ? stats.checked_in / stats.total : 0;
-    const percentage = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(fraction);
-    byId('rate-value').textContent = percentage;
-    byId('rate-bar').value = fraction * 100;
-    byId('stats-time').dateTime = updated;
-    byId('stats-time').textContent = formatTime(updated);
+    if (!total) {
+      const empty = element('div', 'chart-empty');
+      empty.append(element('span', '', I18N.t('dashboard.emptyChart')));
+      plot.append(empty);
+    }
+    chart.replaceChildren(axis, plot, labels);
   }
-  const feed = Realtime.snapshot('/api/stats', data => {
-    stats = data;
-    updated = new Date().toISOString();
-    render();
+  async function fetchChart() {
+    clearTimeout(timer);
+    const version = ++timelineVersion;
+    try {
+      const data = await API.get('/api/stats/timeline', { bucket_minutes: interval.value, buckets: 8 });
+      if (version !== timelineVersion) return;
+      timeline = data;
+      UI.notice('timeline-notice');
+      renderChart();
+    } catch (error) {
+      if (version === timelineVersion) UI.showError('timeline-notice', error);
+    }
+  }
+
+  function renderRecent() {
+    personList(byId('dash-recent'), recent, 'checked_in_at', 'dashboard.emptyRecent');
+  }
+  // Keep the latest five check-ins and accept profile/status changes only from newer snapshots.
+  function remember(people) {
+    const byPerson = new Map(recent.map(person => [person.id, person]));
+    for (const person of people) {
+      if (!person?.checked_in_at) continue;
+      const previous = byPerson.get(person.id);
+      if (!previous || previous.updated_at <= person.updated_at) byPerson.set(person.id, person);
+    }
+    recent = [...byPerson.values()].sort((a, b) =>
+      b.checked_in_at.localeCompare(a.checked_in_at) || b.id - a.id).slice(0, 5);
+    renderRecent();
+  }
+
+  function renderStage() {
+    if (!stage) return;
+    personList(byId('dash-current'), stage.current ? [stage.current] : [], 'called_at', 'stage.idle');
+    personList(byId('dash-queue'), stage.queue.slice(0, 5), null, 'stage.emptyQueue', true);
+  }
+  const stageFeed = Realtime.snapshot('/api/stage/state', data => {
+    stage = data;
+    remember([data.current, ...data.queue, ...data.recent_completed]);
+    renderStage();
   });
-  window.addEventListener('langchange', render);
-  feed.refresh();
-  Realtime.connect({ onStats: feed.accept, onConnect: feed.refresh });
+  async function loadRoster() {
+    if (!admin) return;
+    const version = ++rosterVersion;
+    try {
+      // The roster is ordered by ID. A late check-in may be on any page.
+      let page = 1;
+      while (true) {
+        const data = await API.get('/api/participants', { page, per_page: 100 });
+        if (version !== rosterVersion) return;
+        remember(data.items);
+        if (page * data.per_page >= data.total) break;
+        page++;
+      }
+      UI.notice('recent-notice');
+    } catch (error) {
+      if (version === rosterVersion) UI.showError('recent-notice', error);
+    }
+  }
+  function refresh() { stageFeed.refresh(); fetchChart(); loadRoster(); }
+  interval.addEventListener('change', fetchChart);
+  window.addEventListener('langchange', () => { renderChart(); renderStage(); renderRecent(); });
+  setInterval(fetchChart, 60000);
+  Realtime.connect({
+    onStage: stageFeed.accept, onConnect: refresh,
+    onStats: () => { clearTimeout(timer); timer = setTimeout(fetchChart, 300); },
+    onParticipant: ({ action, participant }) => {
+      if (action === 'check_in' || recent.some(p => p.id === participant.id)) remember([participant]);
+    }
+  });
+  refresh();
 })();

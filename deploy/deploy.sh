@@ -18,7 +18,7 @@ find . -xdev -name '._*' -delete
 chown -R "$account:$account" .
 chmod 600 .env
 
-[[ -x .venv/bin/python ]] || runuser -u "$account" -- python3 -m venv .venv
+[[ -x .venv/bin/python ]] || runuser -u "$account" -- "${PYTHON:-python3}" -m venv .venv
 runuser -u "$account" -- .venv/bin/pip install -q -i "$INDEX" -r requirements.txt
 
 run_app() { runuser -u "$account" -- env -i PATH=/usr/bin:/bin .venv/bin/python "$@"; }

@@ -1,0 +1,68 @@
+{% from "_icons.html" import icon %}
+{% macro tr(key, fallback) -%}<span data-i18n="{{ key }}">{{ fallback }}</span>{%- endmacro %}
+{% macro brand() -%}
+<a class="brand" href="/"><span class="brand-mark">{{ icon('graduation-cap') }}</span>{{ tr('app.name', 'GradCheck') }}</a>
+{%- endmacro %}
+{% macro languages() -%}
+<div class="languages" role="group" data-i18n-aria="lang.label" aria-label="语言">
+  <button type="button" data-lang="zh" lang="zh">中文</button><span aria-hidden="true">/</span><button type="button" data-lang="en" lang="en">EN</button>
+</div>
+{%- endmacro %}
+{% macro connection() -%}
+<span class="connection" id="conn-status" role="status" data-i18n="connection.offline">离线</span>
+{%- endmacro %}
+{% macro socket_scripts() -%}
+<script defer src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/realtime.js') }}"></script>
+{%- endmacro %}
+{% macro scanner_scripts() -%}
+<script defer src="{{ url_for('static', filename='vendor/html5-qrcode.min.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/scanner.js') }}"></script>
+{%- endmacro %}
+{% macro heading(page, name) -%}
+<header class="page-heading"><div>
+  <h1 {% if page == 'dashboard' %}id="greeting"{% else %}data-i18n="nav.{{ page }}"{% endif %}>{{ name }}</h1>
+  <p data-i18n="{{ page }}.subtitle"></p>
+</div><div class="date-pill">{{ icon('calendar') }}<time id="today"></time></div></header>
+{%- endmacro %}
+{% macro stat_cards(fields) -%}
+{% set icons = {'total':'users', 'checked_in':'user-check', 'not_checked_in':'clock', 'waiting':'list-ordered', 'on_stage':'mic', 'completed':'circle-check'} %}
+<div class="stats-grid" style="--columns: {{ fields|length }}">
+  {% for field in fields %}
+  <section class="panel stat-card">
+    <span class="icon-tile">{{ icon(icons[field]) }}</span><div class="stat-values">
+      <div class="stat-figure"><strong data-stat="{{ field }}">—</strong>
+      {% if field == 'checked_in' %}<span class="rate-chip" data-i18n-title="stats.rate">{{ icon('trending-up') }}<span data-rate>—</span></span>{% endif %}</div>
+      <span class="stat-label" data-i18n="stats.{{ field }}"></span>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{%- endmacro %}
+{% macro card_head(glyph, key, fallback, href='', link_key='common.viewAll', target_id='') -%}
+<header class="card-head"><h2{% if target_id %} id="{{ target_id }}"{% endif %}>{{ icon(glyph) }}{{ tr(key, fallback) }}</h2>
+{% if href %}<a class="card-link" href="{{ href }}">{{ tr(link_key, '查看全部') }}{{ icon('arrow-right') }}</a>{% endif %}</header>
+{%- endmacro %}
+{% macro scan_panel(submit_key, submit_text) -%}
+<section class="panel scan-panel" aria-labelledby="scan-title">
+  {{ card_head('scan-line', 'scan.title', '扫描二维码', target_id='scan-title') }}
+  <div class="scan-body">
+    <div class="camera-frame" id="camera-frame">
+      <div class="camera-placeholder">{{ icon('scan-line') }}{{ tr('scan.aim', '将二维码放入取景框内') }}</div><div id="reader"></div>
+    </div>
+    <div id="photo-reader" hidden></div>
+    <div class="banner" id="camera-notice" role="status" hidden></div>
+    <div class="banner" id="photo-notice" role="alert" hidden></div>
+    <div class="actions scan-actions">
+      <button type="button" class="button primary" id="camera-toggle">{{ icon('camera') }}{{ tr('scan.start', '启动摄像头') }}</button>
+      <input class="visually-hidden" type="file" id="scan-photo" accept="image/*" capture="environment">
+      <label for="scan-photo" class="button" id="photo-button">{{ icon('image') }}{{ tr('scan.photo', '拍照识别') }}</label>
+    </div>
+    <form id="manual-form" class="manual-form">
+      <label for="manual-code" data-i18n="scan.manual">手动输入参与者编号</label>
+      <div class="input-action"><input id="manual-code" name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" data-i18n-placeholder="field.codeExample" placeholder="例如 G2026001">
+      <button class="button" type="submit" data-i18n="{{ submit_key }}">{{ submit_text }}</button></div>
+    </form>
+  </div>
+</section>
+{%- endmacro %}

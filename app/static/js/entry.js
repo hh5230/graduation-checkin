@@ -21,6 +21,8 @@
 
   function render() {
     panel.hidden = !participant;
+    byId('confirmation-actions').hidden = !participant;
+    document.body.classList.toggle('reviewing', Boolean(participant));
     confirm.disabled = busy || !participant || participant.status !== 'registered';
     cancel.disabled = busy;
     if (participant) {
@@ -62,7 +64,10 @@
       busy = false;
       scanner.hold(Boolean(participant));
       render();
-      if (participant) (confirm.disabled ? cancel : confirm).focus();
+      if (participant) {
+        panel.scrollIntoView({ block: 'nearest' });
+        (confirm.disabled ? cancel : confirm).focus({ preventScroll: true });
+      }
     }
   }
 
@@ -109,4 +114,9 @@
   });
   window.addEventListener('langchange', render);
   render();
+  const code = new URLSearchParams(location.search).get('code')?.trim();
+  if (code) {
+    byId('manual-code').value = code;
+    lookup({ code });
+  }
 })();

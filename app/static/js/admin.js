@@ -1,9 +1,11 @@
 (() => {
   'use strict';
 
-  const { byId, element, notice, showError } = UI;
+  const { byId, notice, showError } = UI;
   const search = byId('search');
   const filter = byId('status-filter');
+  let selectedStatus = '';
+  search.value = new URLSearchParams(location.search).get('q') || '';
   const rows = byId('participant-rows');
   const editor = byId('editor');
   const form = byId('editor-form');
@@ -21,32 +23,9 @@
   let saving = false;
   let regenerating = false;
 
-  function cell(key, value, className) {
-    const td = element('td', className);
-    td.append(element('span', 'mobile-label', I18N.t(key)));
-    const content = value instanceof Node ? value : element('span', 'cell-value', value);
-    td.append(content);
-    return td;
-  }
-  function action(key, handler) {
-    const button = element('button', 'row-button', I18N.t(key));
-    button.type = 'button';
-    button.addEventListener('click', handler);
-    return button;
-  }
   function rowFor(person) {
-    const row = element('tr');
-    const checkin = element('div', 'time-cell');
-    checkin.append(element('span', '', formatTime(person.checked_in_at)));
-    if (person.checked_in_by) checkin.append(element('small', '', person.checked_in_by.name));
-    const actions = element('div', 'row-actions');
-    actions.append(action('admin.edit', () => openEditor(person)), action('admin.qr', () => openQr(person)));
-    row.append(cell('field.code', person.participant_code, 'code-cell'),
-      cell('field.name', person.name, 'name-cell'), cell('field.email', person.email),
-      cell('field.status', UI.badge(person.status)), cell('field.checkin', checkin),
-      cell('field.queued', formatTime(person.queued_at)), cell('field.called', formatTime(person.called_at)),
-      cell('field.completed', formatTime(person.completed_at)), cell('common.actions', actions));
-    return row;
+    return UI.personRow(person, { email: true, timeField: 'checked_in_at',
+      actions: [['admin.edit', 'edit', openEditor], ['admin.qr', 'qr', openQr]] });
   }
   function render() {
     rows.textContent = '';
@@ -67,7 +46,7 @@
     previous.disabled = next.disabled = true;
     try {
       const result = await API.get('/api/participants', {
-        q: search.value.trim(), status: filter.value, page, per_page: 20
+        q: search.value.trim(), status: selectedStatus, page, per_page: 20
       });
       if (ticket !== version) return;
       const last = Math.max(1, Math.ceil(result.total / result.per_page));
@@ -100,7 +79,13 @@
     render();
   }
   search.addEventListener('input', () => refilter(250));
-  filter.addEventListener('change', () => refilter(0));
+  filter.addEventListener('click', event => {
+    const selected = event.target.closest('[data-status]');
+    if (!selected || selectedStatus === selected.dataset.status) return;
+    selectedStatus = selected.dataset.status;
+    filter.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === selected)));
+    refilter(0);
+  });
   previous.addEventListener('click', () => { --page; loadList(); });
   next.addEventListener('click', () => { ++page; loadList(); });
 

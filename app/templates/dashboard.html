@@ -3,22 +3,28 @@
 {% set title_key = 'nav.dashboard' %}
 {% block title %}数据总览{% endblock %}
 {% block content %}
-<div class="page-heading"><h1 data-i18n="nav.dashboard">数据总览</h1>{{ connection() }}</div>
-<div class="banner" id="state-notice" role="alert" hidden></div>
-<section class="rate-panel" aria-labelledby="rate-heading">
-  <div class="rate-heading"><h2 id="rate-heading" data-i18n="stats.rate">签到率</h2><strong id="rate-value" class="rate-value">—</strong></div>
-  <progress id="rate-bar" max="100" aria-labelledby="rate-heading"></progress>
-</section>
-<div class="stats-grid">
-  {% for field, label in [('total','参与者总数'),('checked_in','已签到人数'),('not_checked_in','未签到人数'),('waiting','排队人数'),('on_stage','台上人数'),('completed','已完成人数')] %}
-  <section class="panel stat-card stat-{{ field }}">
-    <h2 data-i18n="stats.{{ field }}">{{ label }}</h2>
-    <strong id="stat-{{ field }}">—</strong>
+{{ heading(page, '数据总览') }}
+{{ stat_cards(['total', 'checked_in', 'not_checked_in', 'waiting', 'on_stage', 'completed']) }}
+<div class="dashboard-grid">
+  <section class="panel chart-panel"><header class="card-head"><h2>{{ icon('chart-column') }}{{ tr('dashboard.chart','签到趋势') }}</h2>
+    <select id="chart-interval" data-i18n-aria="dashboard.interval" aria-label="统计间隔">
+      {% for minutes in [15, 30, 60] %}<option value="{{ minutes }}" data-i18n="dashboard.minutes{{ minutes }}"{% if minutes == 30 %} selected{% endif %}>{{ minutes }} 分钟</option>{% endfor %}
+    </select></header>
+    <div class="chart-body"><div class="chart-summary"><strong id="chart-total">—</strong><span data-i18n="dashboard.windowCount">时段内签到人数</span></div>
+      <div class="banner" id="timeline-notice" role="alert" hidden></div><div id="timeline" class="chart"></div>
+      <div class="chart-key"><span data-i18n="dashboard.previous">历史时段</span><span data-i18n="dashboard.current">当前时段</span></div>
+    </div>
   </section>
-  {% endfor %}
+  <div class="panel-stack stage-summary">
+    <section class="panel">{{ card_head('mic','display.now','正在上台','/display','nav.display') }}
+      <ul class="person-list" id="dash-current"></ul></section>
+    <section class="panel">{{ card_head('list-ordered','stage.queue','等候队列','/stage') }}
+      <ol class="person-list" id="dash-queue"></ol></section>
+  </div>
 </div>
+<div class="banner" id="state-notice" role="alert" hidden></div>
+<section class="panel">{{ card_head('user-check','dashboard.recent','最近签到','/admin' if current_user.role == 'admin' else '/entry','nav.admin' if current_user.role == 'admin' else 'nav.entry') }}
+  <div class="banner" id="recent-notice" role="alert" hidden></div><ul class="person-list" id="dash-recent"></ul></section>
 <p class="updated">{{ tr('stats.updated', '最后更新') }} <time id="stats-time">—</time></p>
 {% endblock %}
-{% block scripts %}{{ socket_scripts() }}
-<script defer src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-{% endblock %}
+{% block scripts %}<script defer src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endblock %}

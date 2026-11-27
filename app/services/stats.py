@@ -1,4 +1,5 @@
 import json
+from datetime import UTC
 
 from flask import current_app
 from redis.exceptions import WatchError
@@ -59,3 +60,31 @@ def get_stats():
         if stats is not None:
             return stats
     return compute_stats()
+
+
+TIMELINE = text("""
+    WITH bounds AS (
+        SELECT now() AS finish, make_interval(mins => :minutes) AS step
+    ), window_start AS (
+        SELECT finish - :buckets * step AS origin, finish, step FROM bounds
+    ), counts AS (
+        SELECT date_bin(step, checked_in_at, origin) AS start_at, count(*) AS n
+        FROM participants CROSS JOIN window_start
+        WHERE checked_in_at >= origin AND checked_in_at < finish
+        GROUP BY 1
+    )
+    SELECT start_at, start_at + step AS end_at, coalesce(n, 0) AS n,
+           start_at + step = finish AS current
+    FROM window_start
+    CROSS JOIN LATERAL generate_series(origin, finish - step, step) AS slots(start_at)
+    LEFT JOIN counts USING (start_at)
+    ORDER BY start_at
+""")
+
+
+def get_timeline(minutes, buckets):
+    rows = db.session.execute(TIMELINE, {"minutes": minutes, "buckets": buckets}).mappings()
+    return {"bucket_minutes": minutes, "buckets": [
+        {"start": row.start_at.astimezone(UTC).isoformat(), "end": row.end_at.astimezone(UTC).isoformat(),
+         "count": row.n, "current": row.current} for row in rows
+    ]}

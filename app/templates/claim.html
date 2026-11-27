@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set page = 'claim' %}
+{% set title_key = 'claim.title' %}
+{% block title %}领取我的二维码{% endblock %}
+{% block content %}
+<div id="claim-entry">
+  <h1 data-i18n="claim.title">领取我的二维码</h1><p class="subtitle" data-i18n="claim.subtitle">输入参与者编号和登记邮箱，领取毕业典礼通行证。</p>
+  <form id="claim-form" class="form-stack" action="/api/public/claim" method="post">
+    <label>{{ tr('field.code','参与者编号') }}<input name="participant_code" required maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" data-i18n-placeholder="field.codeExample" placeholder="例如 G2026001"></label>
+    <label>{{ tr('claim.email','登记邮箱') }}<input name="email" type="email" required maxlength="255" autocomplete="email"></label>
+    <div class="banner" id="claim-notice" role="alert" hidden></div>
+    <button type="submit" class="button primary">{{ icon('qr-code') }}{{ tr('claim.submit','领取二维码') }}</button>
+  </form>
+</div>
+<section id="claim-result" class="qr-ticket" aria-labelledby="claim-name" hidden>
+  <h1 id="claim-name" tabindex="-1"></h1><div class="pass-identity"><span class="mono" id="claim-code"></span><span id="claim-status"></span></div>
+  <img id="claim-image" width="280" height="280" data-i18n-alt="admin.qrImage" alt="参与者二维码">
+  <p data-i18n="claim.instructions">入场和上台排队时，请向工作人员出示此二维码。</p>
+  <a id="claim-download" class="button primary" download>{{ icon('download') }}{{ tr('claim.download','下载 PNG') }}</a>
+  <button type="button" class="text-button" id="claim-again" data-i18n="claim.again">重新查询</button>
+</section>
+<div class="public-links"><a href="/login">{{ icon('arrow-right') }}{{ tr('login.title','工作台登录') }}</a></div>
+{% endblock %}
+{% block scripts %}<script defer src="{{ url_for('static', filename='js/claim.js') }}"></script>{% endblock %}

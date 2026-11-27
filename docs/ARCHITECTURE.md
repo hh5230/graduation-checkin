@@ -260,3 +260,39 @@ data：`{"bucket_minutes": 30, "buckets": [{"start": ISO, "end": ISO, "count": 3
 `REDIS_URL=redis://localhost:6380/0`
 `SECRET_KEY=change-me`
 `PORT=5001`
+
+## 14. 现场操作视角增补（v2，最高原则：方便现场人员操作、减少出错）
+
+### 14.1 角色与落地页（schema v2 迁移见 db/schema.sql 末尾）
+| 角色 | 设备 | 可用功能 | 登录后进入 |
+|---|---|---|---|
+| admin | 电脑 | 全部 | `/admin` |
+| checkin（入口签到员） | 单手手机 | lookup/search/checkin、Dashboard 只读 | `/entry` |
+| stage（候场/舞台控制员） | 手机/平板 | lookup、stage/*、Dashboard 只读 | `/stage` |
+| staff（兼容旧账号 = checkin+stage） | 手机 | 同 checkin+stage | `/entry` |
+| viewer（组织者） | 手机 | `/dashboard`、`/display`、`GET /api/stats*`、`GET /api/stage/state` | `/dashboard` |
+`/display` 允许 admin/staff/stage/viewer。导航只显示该角色可用的入口；越权 API 返回 403。
+默认账号新增：`checkin1/checkin123`（checkin）、`stage1/stage123`（stage）、`viewer1/viewer123`（viewer）；保留 admin、staff1、staff2。
+
+### 14.2 新增/变更接口
+| 方法 | 路径 | 角色 | 说明 |
+|---|---|---|---|
+| GET | `/api/checkin/search?q=` | admin/staff/checkin | 无二维码时按姓名/编号/邮箱模糊搜索（≥1 字符，最多 20 条，不返回 qr_token），返回 `[P]` |
+| POST | `/api/checkin` | admin/staff/checkin | 新增可选 `entrance`（≤64 字符，设备上选择的入口名）。`ALREADY_CHECKED_IN.details` 增加 `checked_in_entrance` |
+| POST | `/api/stage/requeue` | admin/staff/stage | `{participant_id}`：被叫的人不在 → 当前 on_stage 者放回队尾（status=queued, queued_at=clock_timestamp(), requeue_count+1, 审计 `requeue`），与 call/complete 共用 advisory lock；不是当前上台者 → `NOTHING_ON_STAGE` |
+| GET | `/api/stage/state` | +viewer | 返回增加 `next`（队首 P 或 null）、`queue_length` |
+| POST | `/api/participants/import` | admin | `multipart/form-data` 字段 `file`（CSV，UTF-8/UTF-8-BOM，表头 `participant_code,name,email`）。逐行校验，合法行在一个事务中插入；返回 `{created, skipped_existing, errors: [{line, participant_code, code, message}]}`；整文件格式错误 → 400。审计 `import`。（此接口例外：multipart 而非 JSON） |
+| GET | `/admin/qr-sheet?status=&q=` | admin（页面） | 可打印二维码清单页（每张卡：二维码图、姓名、编号；A4 打印样式，每页 12 张） |
+| GET | `/api/participants/<id>/timeline` | admin | 审计时间线 `[{action, at, operator: {id,name}, details}]`（升序） |
+| POST | `/api/participants/<id>/undo` | admin | `{reason}`（必填 1–200 字）撤销最近一次状态变更：checked_in→registered（清空签到字段）、queued→checked_in（清空入队字段）、on_stage→queued（清空呼叫字段，保留原 queued_at）、completed→on_stage（需无人在台上，否则 `STAGE_BUSY`；清空完成字段）。registered 无可撤销 → `INVALID_STATE`。条件 UPDATE + 舞台类走 advisory lock；审计 `undo`，details `{reason, from, to}`；广播。 |
+| GET | `/api/export/records.csv` | admin | CSV（UTF-8 BOM，Excel 可直接打开）：编号、姓名、邮箱、状态、签到时间、签到入口、签到人、入队时间、呼叫时间、呼叫人、完成时间、完成人、放回队尾次数 |
+| GET | `/api/stats/timeline` | +viewer | Dashboard 默认 `bucket_minutes=10` |
+
+### 14.3 错误提示规则
+每个业务错误返回 `code` + 本地化 `message` + `details`（相关信息，如首次签到时间/入口/操作人、当前上台者、队列位置），前端照此显示，不能只显示状态码。并发冲突（`ALREADY_CHECKED_IN` 由其他设备造成、`STAGE_BUSY`、`NOTHING_ON_STAGE`、`ALREADY_QUEUED`）前端统一附加提示"已被同事处理 / Already handled by a colleague"。
+
+### 14.4 前端交互要求
+- 签到员：打开即扫码 → 大字资料卡 → 一键确认 → 自动回到扫码；结果整屏颜色 + 震动（绿成功 / 橙重复 / 红无效），约 2 秒后自动复位；无二维码时搜索（姓名/编号/邮箱）后签到；入口名称在设备上选择一次并记住（localStorage），随签到提交。
+- 候场/舞台：大字显示当前上台、下一位、队伍长度；"呼叫下一位""完成上台"固定在屏幕底部拇指区；"不在场，放回队尾"作为次要按钮。
+- 大屏：姓名特大号、编号、下一位；切换过渡动画；无人上台显示"准备中 / Getting ready"；断线自动重连并重新拉取；**页面无任何操作按钮**（语言通过 `?lang=en`，全屏通过按 F 键或双击）。
+- Dashboard：6 个统计、签到率进度条、每 10 分钟到场人数柱状图、实时更新。
