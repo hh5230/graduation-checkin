@@ -27,7 +27,7 @@ PROTECTED_ENDPOINTS = ADMIN_ENDPOINTS + [
 def test_login_me_logout(client, rows):
     user = login(client, "staff1")
     stored, = rows("SELECT id, username, display_name, role FROM users WHERE username = 'staff1'")
-    assert user == dict(stored)
+    assert user == {**stored, "home": "/entry"}
     assert user["role"] == "staff"
     assert success(client.get("/api/auth/me")) == {"user": user}
     assert success(client.post("/api/auth/logout", json={})) == {}

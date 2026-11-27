@@ -2,7 +2,9 @@ from pathlib import Path
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, send_file, url_for
 
-from .auth import current_user, page_roles_required
+from .auth import ADMIN_ROLES, CHECKIN_ROLES, DISPLAY_ROLES, STAGE_ROLES, VIEW_ROLES, current_user, page_roles_required
+from .i18n import get_lang
+from .services.participants import qr_sheet_participants
 
 bp = Blueprint("views", __name__)
 
@@ -20,13 +22,14 @@ def index():
     user = current_user()
     if user is None:
         return redirect(url_for("views.login"))
-    return redirect(url_for("views.admin" if user.role == "admin" else "views.entry"))
+    return redirect(user.home)
 
 
 @bp.get("/login")
 def login():
-    if current_user() is not None:
-        return redirect(url_for("views.index"))
+    user = current_user()
+    if user is not None:
+        return redirect(user.home)
     return render_template("login.html")
 
 
@@ -47,30 +50,36 @@ def ca_certificate():
 
 
 @bp.get("/admin")
-@page_roles_required("admin")
+@page_roles_required(*ADMIN_ROLES)
 def admin():
     return render_template("admin.html")
 
 
+@bp.get("/admin/qr-sheet")
+@page_roles_required(*ADMIN_ROLES)
+def qr_sheet():
+    return render_template("qr_sheet.html", participants=qr_sheet_participants(request.args), lang=get_lang())
+
+
 @bp.get("/entry")
-@page_roles_required("staff", "admin")
+@page_roles_required(*CHECKIN_ROLES)
 def entry():
     return render_template("entry.html")
 
 
 @bp.get("/stage")
-@page_roles_required("staff", "admin")
+@page_roles_required(*STAGE_ROLES)
 def stage():
     return render_template("stage.html")
 
 
 @bp.get("/display")
-@page_roles_required("staff", "admin")
+@page_roles_required(*DISPLAY_ROLES)
 def display():
     return render_template("display.html")
 
 
 @bp.get("/dashboard")
-@page_roles_required("staff", "admin")
+@page_roles_required(*VIEW_ROLES)
 def dashboard():
     return render_template("dashboard.html")

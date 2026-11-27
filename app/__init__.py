@@ -17,11 +17,12 @@ def create_app(config_name: str | None = None):
     db.init_app(app)
 
     from . import realtime, views
-    from .api import auth, checkin, participants, public, stage, stats
+    from .api import admin_tools, auth, checkin, participants, public, stage, stats
     from .errors import register_error_handlers
 
     for blueprint in (auth.bp, participants.bp, checkin.bp, public.bp, stage.bp, stats.bp, views.bp):
         app.register_blueprint(blueprint)
+    app.register_blueprint(admin_tools.bp)
     register_error_handlers(app)
 
     # The in-process test client needs a local Manager even after a production factory call.

@@ -7,6 +7,13 @@ from .errors import ApiError
 from .extensions import db
 from .models import User
 
+ADMIN_ROLES = frozenset({"admin"})
+CHECKIN_ROLES = ADMIN_ROLES | {"staff", "checkin"}
+STAGE_ROLES = ADMIN_ROLES | {"staff", "stage"}
+LOOKUP_ROLES = CHECKIN_ROLES | STAGE_ROLES
+DISPLAY_ROLES = STAGE_ROLES | {"viewer"}
+VIEW_ROLES = DISPLAY_ROLES | CHECKIN_ROLES
+
 
 def current_user():
     if "graduation.user" not in request.environ:
@@ -43,7 +50,7 @@ def _roles_required(login_required, roles):
         @wraps(view)
         def wrapped(*args, **kwargs):
             if current_user().role not in roles:
-                raise ApiError("FORBIDDEN", 403)
+                raise ApiError("FORBIDDEN", 403, {"role": current_user().role, "allowed_roles": sorted(roles)})
             return view(*args, **kwargs)
         return wrapped
     return decorate

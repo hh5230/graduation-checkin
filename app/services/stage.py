@@ -6,7 +6,7 @@ from ..models import Participant, serialize_participant
 from . import commit_changes, record_change
 from .participants import get_participant, transition_by_identifier
 
-# Both stage controls serialize on this database-wide advisory lock.
+# Call, complete, requeue and stage-related undo share this transaction lock.
 STAGE_LOCK_KEY = 2026001
 
 
@@ -42,7 +42,8 @@ def enqueue(data, operator_id):
 
 
 def current_on_stage():
-    p = db.session.scalar(select(Participant).where(Participant.status == "on_stage"))
+    stmt = select(Participant).where(Participant.status == "on_stage").execution_options(populate_existing=True)
+    p = db.session.scalar(stmt)
     return serialize_participant(p) if p else None
 
 
@@ -55,7 +56,7 @@ def stage_state():
         or_(Participant.status.in_(("on_stage", "queued")), Participant.id.in_(recent))
     ).order_by(Participant.queued_at, Participant.id)
     current, queue, completed = None, [], []
-    for p in db.session.scalars(stmt):
+    for p in db.session.scalars(stmt.execution_options(populate_existing=True)):
         if p.status == "on_stage":
             current = serialize_participant(p)
         elif p.status == "queued":
@@ -63,7 +64,37 @@ def stage_state():
         else:
             completed.append(p)
     completed.sort(key=lambda p: (p.completed_at, p.id), reverse=True)
-    return {"current": current, "queue": queue, "recent_completed": [serialize_participant(p) for p in completed]}
+    return {"current": current, "queue": queue, "recent_completed": [serialize_participant(p) for p in completed],
+            "next": queue[0] if queue else None, "queue_length": len(queue)}
+
+
+def nothing_on_stage(expected_id):
+    return ApiError("NOTHING_ON_STAGE", 409, {"participant_id": expected_id, "current": current_on_stage()})
+
+
+def participant_id_from_body(data):
+    value = data.get("participant_id")
+    if type(value) is not int or not 0 < value <= 2**63 - 1:
+        raise invalid_fields(participant_id="invalid_integer" if "participant_id" in data else "required")
+    return value
+
+
+def requeue(operator_id, data):
+    expected_id = participant_id_from_body(data)
+    lock_stage()
+    stmt = (
+        update(Participant).where(Participant.id == expected_id, Participant.status == "on_stage")
+        .values(status="queued", queued_at=func.clock_timestamp(), called_at=None, called_by=None,
+                requeue_count=Participant.requeue_count + 1, updated_at=func.now())
+        .returning(Participant.id)
+    )
+    if db.session.scalar(stmt) is None:
+        raise nothing_on_stage(expected_id)
+    participant = get_participant(expected_id)
+    event = record_change("requeue", participant, operator_id)
+    result = {"participant": event["participant"], "position": position(participant)}
+    commit_changes(event)
+    return result
 
 
 def finish_current(operator_id, expected_id=None):
@@ -74,14 +105,12 @@ def finish_current(operator_id, expected_id=None):
                        updated_at=func.now()).returning(Participant.id)
     updated = db.session.scalar(stmt)
     if updated is None:
-        raise ApiError("NOTHING_ON_STAGE", 409)
+        raise nothing_on_stage(expected_id)
     return record_change("complete", get_participant(updated), operator_id)
 
 
 def complete(operator_id, data):
-    expected_id = data.get("participant_id")
-    if "participant_id" in data and (type(expected_id) is not int or not 0 < expected_id <= 2**63 - 1):
-        raise invalid_fields(participant_id="invalid_integer")
+    expected_id = participant_id_from_body(data) if "participant_id" in data else None
     lock_stage()
     event = finish_current(operator_id, expected_id)
     commit_changes(event)
@@ -108,7 +137,7 @@ def call_next(operator_id, data):
         .order_by(Participant.queued_at, Participant.id).limit(1).with_for_update(skip_locked=True)
     )
     if next_id is None:
-        raise ApiError("QUEUE_EMPTY", 409)
+        raise ApiError("QUEUE_EMPTY", 409, {"queue_length": 0, "current": current})
     stmt = (
         update(Participant).where(Participant.id == next_id, Participant.status == "queued")
         .values(status="on_stage", called_at=func.now(), called_by=operator_id, updated_at=func.now())

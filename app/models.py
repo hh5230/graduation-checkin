@@ -7,15 +7,17 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import generate_password_hash
 
 from .config import ROOT
 from .extensions import db
 
+ROLE_HOME = {"admin": "/admin", "staff": "/entry", "checkin": "/entry", "stage": "/stage", "viewer": "/dashboard"}
+
 
 class User(db.Model):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("role IN ('admin', 'staff')"),)
+    __table_args__ = (CheckConstraint("role IN ('admin','staff','checkin','stage','viewer')"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
@@ -25,9 +27,13 @@ class User(db.Model):
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    @property
+    def home(self):
+        return ROLE_HOME[self.role]
+
     def public_info(self):
         return {"id": self.id, "username": self.username,
-                "display_name": self.display_name, "role": self.role}
+                "display_name": self.display_name, "role": self.role, "home": self.home}
 
 
 class Participant(db.Model):
@@ -41,6 +47,8 @@ class Participant(db.Model):
     status: Mapped[str] = mapped_column(String(16), server_default=text("'registered'"))
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_in_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    checked_in_entrance: Mapped[str | None] = mapped_column(String(64))
+    requeue_count: Mapped[int] = mapped_column(server_default=text("0"))
     queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     queued_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -80,13 +88,16 @@ class AuditLog(db.Model):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint("action IN ('create','update','check_in','enqueue','call','complete','regenerate_qr')"),
+        CheckConstraint("action IN ('create','update','check_in','enqueue','call','complete',"
+                        "'regenerate_qr','requeue','undo','import')"),
         Index("ix_audit_logs_participant", participant_id, created_at),
     )
 
 
 def serialize_participant(p: Participant, include_token=False):
-    data = {field: getattr(p, field) for field in ("id", "participant_code", "name", "email", "status")}
+    data = {field: getattr(p, field) for field in (
+        "id", "participant_code", "name", "email", "status", "checked_in_entrance", "requeue_count",
+    )}
     for field in ("checked_in_at", "queued_at", "called_at", "completed_at", "created_at", "updated_at"):
         timestamp = getattr(p, field)
         data[field] = timestamp.astimezone(UTC).isoformat() if timestamp else None
@@ -102,21 +113,21 @@ DEFAULT_USERS = (
     ("admin", "admin123", "admin", "Administrator"),
     ("staff1", "staff123", "staff", "Staff One"),
     ("staff2", "staff123", "staff", "Staff Two"),
+    ("checkin1", "checkin123", "checkin", "Entrance One"),
+    ("stage1", "stage123", "stage", "Stage One"),
+    ("viewer1", "viewer123", "viewer", "Organizer"),
 )
 
 
 def init_database(app: Flask):
-    """Install the authoritative DDL and reconcile the three bootstrap accounts atomically."""
+    """Apply all migrations and create missing bootstrap accounts in one transaction."""
     with app.app_context(), db.session.begin():
         db.session.connection().exec_driver_sql((ROOT / "db/schema.sql").read_text(encoding="utf-8"))
+        usernames = [entry[0] for entry in DEFAULT_USERS]
+        existing = set(db.session.scalars(select(User.username).where(User.username.in_(usernames))))
         for username, password, role, display_name in DEFAULT_USERS:
-            user = db.session.scalar(select(User).where(User.username == username))
-            if user and check_password_hash(user.password_hash, password):
-                if (user.role, user.display_name, user.is_active) == (role, display_name, True):
-                    continue
-                password_hash = user.password_hash
-            else:
-                password_hash = generate_password_hash(password)
-            values = dict(password_hash=password_hash, role=role, display_name=display_name, is_active=True)
-            statement = insert(User).values(username=username, **values)
-            db.session.execute(statement.on_conflict_do_update(index_elements=[User.username], set_=values))
+            if username in existing:
+                continue
+            statement = insert(User).values(username=username, password_hash=generate_password_hash(password),
+                                            role=role, display_name=display_name)
+            db.session.execute(statement.on_conflict_do_nothing(index_elements=[User.username]))

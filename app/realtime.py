@@ -18,16 +18,16 @@ def _send(event, payload):
         current_app.logger.exception("Could not emit %s after commit", event)
 
 
-def broadcast(*events):
+def broadcast(*events, stats_changed=False):
     """Publish committed transitions. QR tokens are absent from all public events."""
     actions = {event["action"] for event in events}
     try:
         invalidate_stats()
         for event in events:
             _send("participant_updated", event)
-        if actions.intersection({"enqueue", "call", "complete"}):
+        if actions.intersection({"enqueue", "call", "complete", "requeue", "undo"}):
             _send("stage_updated", stage_state())
-        if actions.intersection({"create", "check_in", "enqueue", "call", "complete"}):
+        if stats_changed or actions.intersection({"create", "check_in", "enqueue", "call", "complete", "requeue", "undo"}):
             _send("stats_updated", compute_stats())
     except Exception:
         db.session.rollback()

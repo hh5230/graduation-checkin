@@ -1,3 +1,5 @@
+import re
+
 from flask import current_app, jsonify, render_template, request
 from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import HTTPException
@@ -16,6 +18,11 @@ class ApiError(Exception):
 
 def invalid_fields(**fields):
     return ApiError("VALIDATION_ERROR", 400, {"fields": fields})
+
+
+def is_db_text(value):
+    # JSON strings may contain NUL or unpaired surrogates, both invalid in PostgreSQL text.
+    return isinstance(value, str) and re.search(r"[\x00\ud800-\udfff]", value) is None
 
 
 def render_error(error):
@@ -50,9 +57,9 @@ def register_error_handlers(app):
         db.session.rollback()
         name = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
         if name == "participants_participant_code_key":
-            return render_error(ApiError("DUPLICATE_CODE", 409))
+            return render_error(ApiError("DUPLICATE_CODE", 409, {"field": "participant_code"}))
         if name == "uq_participants_email_lower":
-            return render_error(ApiError("DUPLICATE_EMAIL", 409))
+            return render_error(ApiError("DUPLICATE_EMAIL", 409, {"field": "email"}))
         if name == "uq_one_on_stage":
             from .services.stage import current_on_stage
             return render_error(ApiError("STAGE_BUSY", 409, {"current": current_on_stage()}))

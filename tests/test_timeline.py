@@ -15,7 +15,7 @@ def test_timeline_access_and_defaults(client, staff_client, admin_client):
     error(client.get(PATH), 401, "UNAUTHORIZED")
     for authorized in (staff_client, admin_client):
         data = success(authorized.get(PATH))
-        assert data["bucket_minutes"] == 30
+        assert data["bucket_minutes"] == 10
         buckets = data["buckets"]
         assert len(buckets) == 8
         assert [b["current"] for b in buckets] == [False] * 7 + [True]
@@ -23,7 +23,7 @@ def test_timeline_access_and_defaults(client, staff_client, admin_client):
         for i, bucket in enumerate(buckets):
             start, end = (datetime.fromisoformat(bucket[k]) for k in ("start", "end"))
             assert start.utcoffset() == end.utcoffset() == timedelta(0)
-            assert end - start == timedelta(minutes=30)
+            assert end - start == timedelta(minutes=10)
             if i:
                 assert buckets[i - 1]["end"] == bucket["start"]
 

@@ -3,7 +3,7 @@ import secrets
 
 from sqlalchemy import func, or_, select, update
 
-from ..errors import ApiError, invalid_fields
+from ..errors import ApiError, invalid_fields, is_db_text
 from ..extensions import db
 from ..models import Participant, serialize_participant
 from . import commit_changes, record_change
@@ -29,7 +29,7 @@ def profile_values(data, partial):
         if value is None or (isinstance(value, str) and not value.strip()):
             errors[field] = "required"
             continue
-        if not isinstance(value, str) or "\x00" in value:
+        if not is_db_text(value):
             errors[field] = "invalid"
             continue
         value = value.strip()
@@ -64,25 +64,25 @@ def check_uniqueness(values, exclude_id=None):
         stmt = stmt.where(Participant.id != exclude_id)
     for code, email in db.session.execute(stmt):
         if code == values.get("participant_code"):
-            raise ApiError("DUPLICATE_CODE", 409)
-        raise ApiError("DUPLICATE_EMAIL", 409)
+            raise ApiError("DUPLICATE_CODE", 409, {"participant_code": code})
+        raise ApiError("DUPLICATE_EMAIL", 409, {"email": email})
 
 
 def get_participant(participant_id, *, for_update=False):
     if participant_id > 2**63 - 1:
-        raise ApiError("NOT_FOUND", 404)
+        raise ApiError("NOT_FOUND", 404, {"participant_id": participant_id})
     stmt = select(Participant).where(Participant.id == participant_id)
     if for_update:
         stmt = stmt.with_for_update(of=Participant)
     p = db.session.scalar(stmt.execution_options(populate_existing=True))
     if p is None:
-        raise ApiError("NOT_FOUND", 404)
+        raise ApiError("NOT_FOUND", 404, {"participant_id": participant_id})
     return p
 
 
 def save_profile(p, action, operator_id, changed_fields):
     db.session.flush()
-    event = record_change(action, p, operator_id, changed_fields)
+    event = record_change(action, p, operator_id, {"changed_fields": sorted(changed_fields)})
     result = serialize_participant(p, include_token=True)
     commit_changes(event)
     return result
@@ -128,22 +128,46 @@ def positive_integer(args, name, default, maximum=None):
     return value
 
 
-def list_participants(args):
-    page = positive_integer(args, "page", 1)
-    per_page = positive_integer(args, "per_page", 20, maximum=100)
+def search_condition(term):
+    if not is_db_text(term):
+        raise invalid_fields(q="invalid")
+    # ILIKE with escaped wildcards keeps codes containing underscores literal.
+    pattern = "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
+    return or_(*(column.ilike(pattern, escape="!") for column in
+                 (Participant.name, Participant.email, Participant.participant_code)))
+
+
+def checkin_search(term):
+    term = term.strip()
+    if not term:
+        raise invalid_fields(q="required")
+    stmt = select(Participant).where(search_condition(term)).order_by(
+        (Participant.participant_code == term.upper()).desc(), Participant.name, Participant.id
+    ).limit(20)
+    return [serialize_participant(p) for p in db.session.scalars(stmt)]
+
+
+def participant_filters(args):
     conditions = []
     if args.get("status"):
         if args["status"] not in STATUSES:
             raise invalid_fields(status="invalid")
         conditions.append(Participant.status == args["status"])
     term = args.get("q", "").strip()
-    if "\x00" in term:
-        raise invalid_fields(q="invalid")
     if term:
-        # Treat the search text literally, including SQL wildcard characters.
-        pattern = "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
-        conditions.append(or_(*(column.ilike(pattern, escape="!") for column in
-                                (Participant.name, Participant.email, Participant.participant_code))))
+        conditions.append(search_condition(term))
+    return conditions
+
+
+def qr_sheet_participants(args):
+    stmt = select(Participant.id, Participant.name, Participant.participant_code).where(*participant_filters(args))
+    return db.session.execute(stmt.order_by(Participant.id)).all()
+
+
+def list_participants(args):
+    page = positive_integer(args, "page", 1)
+    per_page = positive_integer(args, "per_page", 20, maximum=100)
+    conditions = participant_filters(args)
     total = db.session.scalar(select(func.count()).select_from(Participant).where(*conditions))
     offset = (page - 1) * per_page
     items = []
@@ -160,10 +184,10 @@ def lookup_condition(data):
         raw = data["token"]
         token = raw.strip().removeprefix("GRAD:").strip() if isinstance(raw, str) else ""
         if not TOKEN.fullmatch(token):
-            raise ApiError("INVALID_QR", 404)
+            raise ApiError("INVALID_QR", 404, {"reason": "invalid_format"})
         return Participant.qr_token == token
     code = data["code"]
-    if not isinstance(code, str) or not code.strip() or "\x00" in code:
+    if not is_db_text(code) or not code.strip():
         raise invalid_fields(code="invalid")
     return Participant.participant_code == code.strip().upper()
 
@@ -175,7 +199,7 @@ def lookup(data, *, for_update=False):
     p = db.session.scalar(stmt)
     if p is None:
         if "token" in data:
-            raise ApiError("INVALID_QR", 404)
+            raise ApiError("INVALID_QR", 404, {"reason": "unknown_token"})
         raise ApiError("PARTICIPANT_NOT_FOUND", 404, {"code": data["code"].strip().upper()})
     return p
 

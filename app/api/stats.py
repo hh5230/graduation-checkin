@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from redis import Redis
 from sqlalchemy import text
 
-from ..auth import api_roles_required
+from ..auth import VIEW_ROLES, api_roles_required
 from ..extensions import db, redis_operation
 from ..errors import invalid_fields
 from ..services.participants import positive_integer
@@ -19,15 +19,15 @@ def health():
 
 
 @bp.get("/stats")
-@api_roles_required("staff", "admin")
+@api_roles_required(*VIEW_ROLES)
 def stats():
     return success(get_stats())
 
 
 @bp.get("/stats/timeline")
-@api_roles_required("staff", "admin")
+@api_roles_required(*VIEW_ROLES)
 def timeline():
-    minutes = positive_integer(request.args, "bucket_minutes", 30, maximum=120)
+    minutes = positive_integer(request.args, "bucket_minutes", 10, maximum=120)
     if minutes < 5:
         raise invalid_fields(bucket_minutes="out_of_range")
     buckets = positive_integer(request.args, "buckets", 8, maximum=48)

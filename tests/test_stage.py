@@ -20,7 +20,7 @@ def test_registered_cannot_enqueue(staff_client, make_participant, participant_r
 def test_empty_stage(staff_client, rows):
     error(staff_client.post("/api/stage/call-next", json={}), 409, "QUEUE_EMPTY")
     error(staff_client.post("/api/stage/complete", json={}), 409, "NOTHING_ON_STAGE")
-    assert state(staff_client) == {"queue": [], "current": None, "recent_completed": []}
+    assert state(staff_client) == {"queue": [], "current": None, "recent_completed": [], "next": None, "queue_length": 0}
     assert rows("SELECT id FROM audit_logs") == []
 
 
@@ -121,6 +121,6 @@ def test_complete_current_is_atomic(staff_client, make_participant, participant_
     assert result["current"]["id"] == second["id"]
     assert result["current"]["status"] == participant_row(second["id"])["status"] == "on_stage"
     assert state(staff_client) == {"current": result["current"], "queue": [],
-                                   "recent_completed": [result["completed"]]}
+                                   "recent_completed": [result["completed"]], "next": None, "queue_length": 0}
     assert [row["action"] for row in audit_for(first["id"])] == ["create", "check_in", "enqueue", "call", "complete"]
     assert [row["action"] for row in audit_for(second["id"])] == ["create", "check_in", "enqueue", "call"]

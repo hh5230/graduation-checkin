@@ -24,6 +24,18 @@ messages = {
 }
 
 
+def csv_row_message(code, fields, lang):
+    if not fields:
+        return messages[code][lang]
+    reasons = {
+        "required": {"zh": "必填", "en": "required"},
+        "invalid": {"zh": "格式无效", "en": "invalid format"},
+        "too_long": {"zh": "超过长度限制", "en": "too long"},
+        "expected_three_columns": {"zh": "必须包含三列", "en": "expected three columns"},
+    }
+    return ", ".join(f"{field} ({reasons[reason][lang]})" for field, reason in fields.items())
+
+
 def get_lang():
     for value in (request.headers.get("X-Lang"), request.cookies.get("lang")):
         if value in ("zh", "en"):
