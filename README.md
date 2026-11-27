@@ -95,6 +95,9 @@ cp .env.example .env        # 如需修改端口/密钥
 | 用户名 | 密码 | 角色 |
 |---|---|---|
 | admin | admin123 | 管理员（全部功能） |
+| checkin1 | checkin123 | 入口签到员 |
+| stage1 | stage123 | 候场/舞台控制员 |
+| viewer1 | viewer123 | 组织者（数据总览、大屏） |
 | staff1 | staff123 | 工作人员 |
 | staff2 | staff123 | 工作人员 |
 
@@ -171,50 +174,53 @@ _（最终验收后补充实际结果）_
 
 ## 7. 服务器部署
 
-**访问地址：<https://36.138.220.233:5000>**（学生领取二维码：<https://36.138.220.233:5000/claim>，根证书：<https://36.138.220.233:5000/ca.crt>）
+**线上地址：<https://checkin.wokdiary.com>**（大屏 `/display`，学生领取二维码 `/claim`）
 
-### 7.1 为什么必须 HTTPS
-手机浏览器只在安全上下文（HTTPS 或 localhost）中开放摄像头接口 `getUserMedia`。因此 gunicorn 直接在 5000 端口用自建根 CA 签发的 IP 证书提供 HTTPS，Socket.IO 同源连接自动升级为 **wss**。扫码页实现三层兜底，三种方式最终都调用同一个后端 API，业务校验只在后端做一次：
-1. 实时扫码（html5-qrcode，安全上下文可用时）；
-2. 拍照识别（`<input type="file" accept="image/*" capture="environment">` + 前端解码，摄像头不可用/被拒时自动出现）；
-3. 手动输入参与者编号。
-
-### 7.2 手机安装证书（安卓优先）
-- **方法一（快速）**：Chrome 打开 `https://36.138.220.233:5000`，出现警告时点「高级 → 继续前往」。
-- **方法二（推荐，安装后不再警告）**：打开 `https://36.138.220.233:5000/ca.crt`（登录页也有「首次使用：安装根证书」链接）下载证书，然后进入 **设置 → 安全 → 更多安全设置 → 加密与凭据 → 安装证书 → CA 证书**，选择下载的文件。不同品牌菜单位置可能不同，可在设置中搜索「CA 证书」。Android 11 以后直接点击下载的文件无法安装，必须从设置里安装。
-- **iOS（次要）**：下载后在「设置」中安装描述文件，再到 **通用 → 关于本机 → 证书信任设置** 中开启完全信任。
-
-### 7.3 服务器组成（不影响已有服务）
-| 组件 | 说明 |
-|---|---|
-| 代码目录 | `/opt/graduation-checkin`（独立 venv：`.venv`） |
-| 应用服务 | `graduation-checkin.service`：gunicorn + gevent（1 worker，WebSocket），`0.0.0.0:5000` HTTPS，开机自启、崩溃自动重启 |
-| Redis | 专用实例 `graduation-checkin-redis.service`，仅监听 `127.0.0.1:6391`（不复用其他项目的 Redis，避免 Pub/Sub 频道互相干扰） |
-| PostgreSQL | 复用已有实例（127.0.0.1:25032），新建专用库与用户 `grad_checkin`，不触碰其他数据库 |
-| 证书 | `/opt/graduation-checkin/certs/`：`ca.crt`（公开）、`server.crt/server.key`（IP 证书）、`ca.key`（权限 600，永不离开服务器、不进 Git） |
-| 密钥 | `/opt/graduation-checkin/.env`（SECRET_KEY、数据库密码），权限 600，只存在于服务器 |
-| 端口 | 对外仅新增 5000；nginx（80/443/8080/9443/9444/8444）及其他应用均未改动 |
-
-### 7.4 部署步骤
-服务器禁用了 scp/sftp，且短时间多次 SSH 会被重置，因此用一次 tar 管道上传、一次 SSH 执行：
-```bash
-# 本地：打包上传（不含 .venv/.env/.git）
-tar --exclude=.venv --exclude=.env --exclude=.git --exclude='__pycache__' --exclude='._*' -cf - . \
-  | ssh root@36.138.220.233 'tar xf - -C /opt/graduation-checkin'
-# 服务器：安装依赖、初始化数据库、导入测试数据、安装并重启 systemd 服务、健康检查
-ssh root@36.138.220.233 'cd /opt/graduation-checkin && PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple bash deploy/deploy.sh'
+### 7.1 架构
 ```
+浏览器 ──HTTPS/WSS──▶ graduation-checkin-nginx (80→301, 443 TLS, Let's Encrypt)
+                         └─ proxy_pass + WebSocket Upgrade ─▶ gunicorn+gevent 127.0.0.1:5000 (graduation-checkin.service)
+                                                                ├─ PostgreSQL（专用库/用户 grad_checkin）
+                                                                └─ Redis 127.0.0.1（库 5：Socket.IO 消息队列 + 统计缓存）
+```
+- 使用**独立的 nginx 实例**（`/etc/graduation-checkin/nginx.conf`，systemd `graduation-checkin-nginx.service`），不加载、不修改系统 nginx 的 `sites-enabled`，不影响服务器上其他项目。
+- 手机浏览器只在 HTTPS 下允许摄像头，因此全站 HTTPS（正式证书，手机无需安装证书）；Socket.IO 同源连接自动使用 wss。
+- 扫码三层兜底：实时扫码 → 拍照识别（`capture="environment"`）→ 手动输入编号，三者调用同一后端 API。
+- Python 使用 uv 安装的独立 3.12（`/opt/graduation-checkin-tools/python`），不改动系统 Python。
+- 选用 gevent 而非 eventlet：psycopg 3 官方支持 gevent 协作式 I/O，eventlet 已处于维护模式。
+- 备用方案（IP + 自签名根 CA，gunicorn 直接提供 TLS）见 `deploy/ip-https/`，含 `/ca.crt` 下载接口（`SHOW_CA_LINK=1` 时登录页显示安装链接）。
 
-### 7.5 服务管理命令
+### 7.2 部署步骤
 ```bash
-systemctl status graduation-checkin          # 状态
-systemctl restart graduation-checkin         # 重启（数据在 PostgreSQL，不丢失）
-journalctl -u graduation-checkin -f          # 实时日志
-systemctl status graduation-checkin-redis    # 专用 Redis
+# 一次性：PostgreSQL 专用库/用户、Redis、/opt/graduation-checkin/.env（600）、nginx + certbot
+certbot certonly --webroot -w /var/www/graduation-checkin-acme -d checkin.wokdiary.com \
+  --deploy-hook "systemctl reload graduation-checkin-nginx"
+# 每次发布：上传代码并执行部署脚本（依赖安装、init_db、seed、重启服务、健康检查）
+git archive HEAD | ssh root@SERVER 'tar xf - -C /opt/graduation-checkin'
+ssh root@SERVER 'PYTHON=/opt/graduation-checkin-tools/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12 bash /opt/graduation-checkin/deploy/deploy.sh'
+```
+生产 `.env` 关键项：`BIND=127.0.0.1:5000`、`GUNICORN_TLS=0`、`TRUST_PROXY=1`、`SESSION_COOKIE_SECURE=1`、`SOCKETIO_ASYNC_MODE=gevent`、`REDIS_URL=redis://127.0.0.1:6379/5`。密钥只存在服务器 `.env`（600），不进 Git。
+
+### 7.3 常用命令
+```bash
+systemctl status|restart graduation-checkin         # 应用（数据在 PostgreSQL，重启不丢失）
+systemctl status|reload  graduation-checkin-nginx   # 专用 nginx
+journalctl -u graduation-checkin -f                 # 日志
+certbot renew --dry-run --cert-name checkin.wokdiary.com   # 续期验证（certbot.timer 自动续期）
 ```
 
 ---
 
 ## 8. 验收结果与未完成项
 
-_（最终验收后补充）_
+### 8.1 验收结果（真实运行）
+- 自动化测试：`pytest` **161 passed**（真实 PostgreSQL 测试库）。
+- 多设备并发（`scripts/concurrency_test.py`，20 个独立会话，本地与线上均执行）：签到 / 入队 / 呼叫下一位 / 完成上台 **各只成功 1 次**，其余 19 次分别返回 `ALREADY_CHECKED_IN` / `ALREADY_QUEUED` / `STAGE_BUSY` / `NOTHING_ON_STAGE`；放回队尾 10 并发只成功 1 次。
+- 线上按「典礼前 → 入场高峰 → 上台流程 → 异常处理 → 典礼结束」时间线执行：权限 401/403、新增/编辑/搜索、CSV 导入（返回错误行）、二维码、学生领码、扫码签到（记录时间/入口/操作人）、重复签到提示首次信息、wss 实时推送（设备 A 操作，设备 B 约 0.6 秒收到）、无效二维码、未签到禁止入队、重复入队、队列排序、呼叫/完成/放回队尾、大屏自动更新、撤销（必须填写原因）、时间线、统计恒等式均通过。
+- HTTPS：`curl https://checkin.wokdiary.com` 证书校验通过（verify=0）；`certbot renew --dry-run` 成功；80 端口 301 跳转 443。
+- 服务器原有服务：部署前后 `ss -tlnp` 对比，原有端口与服务均保留，仅新增 80/443（专用 nginx）、127.0.0.1:5000、127.0.0.1:6379。
+
+### 8.2 未完成 / 已知问题
+1. 安卓真机的实时扫码、拍照识别需要用实机做最终确认（扫码与签到走同一后端 API，已在接口层验证）；iOS 为次要支持。
+2. 默认账号密码仅用于演示，正式使用前需修改。
+3. 未执行整机重启验证（服务器上有其他项目，避免影响）；两个 systemd 服务均已 `enable` 开机自启，`systemctl restart` 后数据不丢失。
