@@ -33,6 +33,7 @@ class Config:
         self.SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "threading")
         cert_dir = "certs" if ROOT == Path("/opt/graduation-checkin") else "deploy"
         self.CA_CERT_PATH = os.getenv("CA_CERT_PATH", str(ROOT / cert_dir / "ca.crt"))
+        self.SHOW_CA_LINK = os.getenv("SHOW_CA_LINK", "").strip().lower() in {"1", "true", "yes"}
         self.HOST = os.getenv("HOST", "0.0.0.0")
         self.PORT = int(os.getenv("PORT", "5001"))
 
