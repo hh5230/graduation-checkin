@@ -71,6 +71,11 @@
     return node;
   }
 
+  function sizeName(node) {
+    node.dataset.long = String(Array.from(node.textContent).length > 14);
+    return node;
+  }
+
   function badge(status) {
     const chip = element('span', 'badge badge-' + status, I18N.t('status.' + status));
     chip.dataset.i18n = 'status.' + status;
@@ -246,7 +251,7 @@
     if (!items.length) node.append(element('li', 'empty', I18N.t(emptyKey)));
     items.forEach((person, index) => node.append(personRow(person, { timeField, position: numbered && index + 1 })));
   }
-  window.UI = { byId, element, badge, notice, showError, errorText, initials, personAvatar, personList, personRow, showDetails, icon };
+  window.UI = { byId, element, sizeName, badge, notice, showError, errorText, initials, personAvatar, personList, personRow, showDetails, icon };
 
   const logout = byId('logout');
   if (logout) logout.addEventListener('click', async () => {

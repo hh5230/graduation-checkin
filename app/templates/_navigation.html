@@ -11,6 +11,9 @@
     <div class="nav-divider"></div>
     <button type="button" class="nav-item" id="logout">{{ icon('log-out') }}{{ tr('auth.logout', '退出登录') }}</button>
   </nav>
+  {% if current_user.role in ['admin','staff','checkin'] %}
+  <a class="nav-item" href="/claim" target="_blank" rel="noopener">{{ icon('qr-code') }}{{ tr('login.claim','领取二维码') }}</a>
+  {% endif %}
   <div class="sidebar-foot">{{ connection() }}</div>
 </aside>
 <button type="button" class="scrim" id="scrim" tabindex="-1" aria-hidden="true" hidden></button>

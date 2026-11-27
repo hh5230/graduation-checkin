@@ -71,7 +71,7 @@ def test_rendered_role_workspaces(operator_accounts, client, username, password,
         page = Page(response)
         assert not (set(page.links) & (set(PAGES) - set(allowed))), (role, path)
         if path == "/display" and path in allowed:
-            assert not page.navs and "button" not in page.tags
+            assert not page.navs and "hidden" in page.ids["display-back"]
             assert {"display-name", "display-next", "conn-status"} <= page.ids.keys()
             continue
         for nav in ("side-nav", "bottom-nav"):

@@ -14,7 +14,7 @@
   <button type="submit" class="button primary">{{ tr('auth.login','登录') }}{{ icon('arrow-right') }}</button>
 </form>
 <div class="public-links">
-  <a href="/claim">{{ icon('qr-code') }}{{ tr('login.claim','学生领取二维码') }}</a>
+  <a class="button" href="/claim">{{ icon('qr-code') }}{{ tr('login.claim','学生领取二维码') }}</a>
   {% if config.SHOW_CA_LINK %}
   <a href="/ca.crt">{{ icon('shield-check') }}{{ tr('login.certificate','首次使用：安装根证书') }}</a>
   {% endif %}

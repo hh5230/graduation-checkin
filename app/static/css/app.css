@@ -571,3 +571,32 @@ input:focus-visible, textarea:focus-visible { outline-offset: 1px; }
   .drawer-open .sidebar { visibility: visible; }
   #entrance-dialog input, dialog textarea { font-size: var(--fs-lg); }
 }
+
+.hero-identity { grid-template-columns: minmax(0, 1fr); }
+.hero-name, #display-name, #display-next {
+  font-family: var(--font-sans);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
+}
+.hero-identity .hero-name[data-long="true"],
+.stage-lineup .panel .hero-name[data-long="true"] { font-size: clamp(1.25rem, 3vw, 2.5rem); }
+#display-name[data-long="true"] { font-size: clamp(2rem, 5vw, 5rem); }
+#display-next[data-long="true"] { font-size: clamp(1rem, 2vw, 2rem); }
+.hero-identity .feature-code, #display-code {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#display-back { position: fixed; top: var(--sp-3); left: var(--sp-3); z-index: 5; }
+@media (prefers-reduced-motion: no-preference) {
+  #display-back { animation: reveal-back 150ms ease-out; }
+  @keyframes reveal-back { from { opacity: 0; } to { opacity: 1; } }
+}

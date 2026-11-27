@@ -16,6 +16,7 @@
   "auth.logout": "Sign out",
   "login.title": "Staff sign-in",
   "login.demo": "Demo accounts",
+  "display.back": "Back",
   "login.claim": "Get my QR code",
   "common.cancel": "Cancel",
   "common.save": "Save",

@@ -13,6 +13,7 @@
   <script defer src="{{ url_for('static', filename='js/display.js') }}"></script>
 </head>
 <body class="display-body">
+  <button id="display-back" class="button" type="button" hidden data-i18n="display.back">返回</button>
   <main class="display-layout">
     <header class="display-header"><span class="brand"><span class="brand-mark">{{ icon('graduation-cap') }}</span>{{ tr('app.name','GradCheck') }}</span>
       <span class="offline-dot" id="conn-status" role="status" data-i18n-title="connection.offline"><span class="visually-hidden" data-i18n="connection.offline">离线</span></span></header>

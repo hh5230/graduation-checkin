@@ -35,7 +35,7 @@
     byId('change-entrance').disabled = search.disabled = busy;
     byId('confirm-checkin').disabled = byId('cancel-checkin').disabled = busy;
     byId('entrance-name').textContent = entrance;
-    if (review) byId('entry-person').replaceChildren(element('strong', 'hero-name', participant.name),
+    if (review) byId('entry-person').replaceChildren(UI.sizeName(element('strong', 'hero-name', participant.name)),
       element('span', 'feature-code', participant.participant_code), badge(participant.status),
       element('span', 'secondary', participant.email));
   }

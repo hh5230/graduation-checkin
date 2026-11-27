@@ -10,10 +10,12 @@
     const name = byId('display-name');
     name.removeAttribute('data-i18n');
     name.textContent = current ? current.name : I18N.t('display.idle');
+    UI.sizeName(name);
     name.classList.toggle('is-idle', !current);
     byId('display-label').hidden = !current;
     byId('display-code').textContent = current?.participant_code || '';
     byId('display-next').textContent = next?.name || '—';
+    UI.sizeName(byId('display-next'));
   }
   function animate(id) {
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -37,8 +39,23 @@
       UI.notice('display-notice');
     } catch (_) { UI.notice('display-notice', 'warning', () => I18N.t('display.fullscreenError')); }
   }
+  const back = byId('display-back');
+  let hideTimer;
+  function goBack() {
+    if (document.referrer && new URL(document.referrer).origin === location.origin) history.back();
+    else location.assign('/');
+  }
+  function revealBack() {
+    back.hidden = false;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { back.hidden = true; }, 3000);
+  }
+  document.addEventListener('pointermove', revealBack);
+  document.addEventListener('pointerdown', revealBack);
+  back.addEventListener('click', goBack);
   document.addEventListener('dblclick', fullscreen);
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !e.repeat) goBack();
     if (e.key.toLowerCase() === 'f' && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) fullscreen();
   });
   window.addEventListener('langchange', render);

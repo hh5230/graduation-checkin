@@ -19,6 +19,7 @@
     const card = byId(id);
     card.replaceChildren(element('strong', person ? 'hero-name' : 'hero-idle',
       person ? person.name : I18N.t(state ? empty : 'common.loading')));
+    if (person) UI.sizeName(card.firstElementChild);
     if (person) card.append(element('span', 'feature-code', person.participant_code));
   }
   function render() {

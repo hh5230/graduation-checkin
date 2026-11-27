@@ -16,6 +16,7 @@
   "auth.logout": "退出",
   "login.title": "工作台登录",
   "login.demo": "演示账号",
+  "display.back": "返回",
   "login.claim": "学生领取二维码",
   "common.cancel": "取消",
   "common.save": "保存",
