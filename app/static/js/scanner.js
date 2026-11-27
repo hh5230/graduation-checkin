@@ -109,6 +109,7 @@
       toggleText.dataset.i18n = running ? 'scan.stop' : 'scan.start';
       toggleText.textContent = I18N.t(toggleText.dataset.i18n);
       frame.classList.toggle('is-running', running);
+      toggle.classList.toggle('is-running', running);
       frame.hidden = Boolean(fallback);
       toggle.classList.toggle('primary', !fallback);
       photoButton.classList.toggle('primary', Boolean(fallback));

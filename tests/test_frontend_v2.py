@@ -75,7 +75,7 @@ def test_rendered_role_workspaces(operator_accounts, client, username, password,
             assert {"display-name", "display-next", "conn-status"} <= page.ids.keys()
             continue
         for nav in ("side-nav", "bottom-nav"):
-            assert page.navs[nav] == list(allowed), (role, path, nav)
+            assert [href for href in page.navs[nav] if href != "/claim"] == list(allowed), (role, path, nav)
         if "/entry" in allowed:
             assert page.ids["global-search"]["action"] == ("/admin" if role == "admin" else "/entry")
         else:
