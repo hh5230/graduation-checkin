@@ -11,6 +11,10 @@
       function mark(online) {
         if (!indicator) return;
         indicator.dataset.online = String(online);
+        if (indicator.classList.contains('offline-dot')) {
+          indicator.hidden = online;
+          return;
+        }
         indicator.dataset.i18n = online ? 'connection.online' : 'connection.offline';
         indicator.textContent = I18N.t(indicator.dataset.i18n);
       }

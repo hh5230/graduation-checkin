@@ -24,6 +24,12 @@
     .long-name { font-size: var(--fs-xs); line-height: var(--lh-tight); }
     code { font: var(--fs-sm) var(--font-mono); }
     @media screen and (max-width: 600px) { .sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media screen {
+      main { padding-block: var(--sp-8); }
+      header { margin-bottom: var(--sp-5); }
+      .card { padding-block: var(--sp-5); border-top: 3px solid var(--color-primary); box-shadow: var(--shadow-card); }
+      code { color: var(--color-text-secondary); letter-spacing: .06em; }
+    }
     @page { size: A4 portrait; margin: 10mm; }
     @media print {
       body { background: var(--color-surface); }

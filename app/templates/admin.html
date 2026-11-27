@@ -7,11 +7,17 @@
 {{ stat_cards(['total', 'checked_in', 'not_checked_in', 'completed']) }}
 <div class="banner" id="admin-notice" role="status" hidden></div>
 <div class="banner" id="list-notice" role="alert" hidden></div>
+
 <section class="panel register" aria-labelledby="roster-title">
   <header class="card-head"><h2 id="roster-title">{{ icon('users') }}{{ tr('admin.roster','参与者名册') }}</h2>
     <button class="button primary" type="button" id="create-person">{{ icon('plus') }}{{ tr('admin.create', '新增参与者') }}</button></header>
   <div class="filters">
     <label class="roster-search">{{ icon('search') }}<input type="search" id="search" autocomplete="off" data-i18n-aria="admin.search" aria-label="搜索参与者" data-i18n-placeholder="admin.searchHint" placeholder="姓名、邮箱或编号"></label>
+    <div class="actions admin-toolbar">
+      <button type="button" class="button" id="open-import">{{ icon('upload') }}{{ tr('admin.import','导入 CSV') }}</button>
+      <a class="button" id="print-sheet" target="_blank" rel="noopener" href="/admin/qr-sheet?status=&amp;q=">{{ icon('qr-code') }}{{ tr('admin.printSheet','打印二维码') }}</a>
+      <a class="button" href="/api/export/records.csv" download>{{ icon('download') }}{{ tr('admin.export','导出记录') }}</a>
+    </div>
     <div class="segments" id="status-filter" role="group" data-i18n-aria="field.status" aria-label="状态">
       {% for status, field in [('', 'total'),('registered','not_checked_in'),('checked_in','checked_only'),('queued','waiting'),('on_stage','on_stage'),('completed','completed')] %}
       <button type="button" data-status="{{ status }}" aria-pressed="{{ 'false' if status else 'true' }}">{{ tr('status.' ~ status if status else 'admin.all', '全部' if not status else '') }} <span>(<span data-stat="{{ field }}">—</span>)</span></button>
@@ -63,6 +69,36 @@
     </div>
   </section>
 </dialog>
+<dialog id="import-dialog" aria-labelledby="import-title">
+  <header class="dialog-head"><h2 id="import-title" data-i18n="admin.import">导入 CSV</h2>
+    <button class="icon-button" data-close data-i18n-aria="common.close" aria-label="关闭">{{ icon('x') }}</button></header>
+  <form id="import-form" class="form-stack">
+    <label>{{ tr('admin.file','CSV 文件') }}<input type="file" name="file" accept=".csv,text/csv" required></label>
+    <div class="actions"><button class="button primary" type="submit" data-i18n="admin.import">导入 CSV</button>
+    <a id="csv-template" download="participants-template.csv" data-i18n="admin.template">下载 CSV 模板</a></div>
+  </form>
+  <div class="banner" id="import-notice" role="alert" hidden></div>
+  <div id="import-result" aria-live="polite" hidden>
+    <p class="import-counts"><span>{{ tr('admin.createdCount','已新增') }} <strong id="import-created"></strong></span>
+    <span>{{ tr('admin.skipped','已有记录跳过') }} <strong id="import-skipped"></strong></span></p>
+    <table id="import-errors"><thead><tr><th data-i18n="admin.line">行号</th><th data-i18n="field.code">编号</th>
+    <th data-i18n="admin.errorMessage">错误信息</th></tr></thead><tbody></tbody></table>
+  </div>
+</dialog>
+<dialog id="undo-dialog" aria-labelledby="undo-title">
+  <form id="undo-form" class="form-stack">
+    <h2 id="undo-title" data-i18n="admin.undo">撤销上一步操作</h2><strong class="undo-person" id="undo-person"></strong>
+    <label>{{ tr('admin.reason','撤销原因（1–200 字）') }}<textarea name="reason" rows="3" required minlength="1" maxlength="200"></textarea></label>
+    <div id="undo-notice" class="banner" role="alert" hidden></div>
+    <div class="actions"><button class="button danger" type="submit" data-i18n="admin.undo">撤销上一步操作</button>
+    <button class="button" type="button" data-close data-i18n="common.cancel">取消</button></div>
+  </form>
+</dialog>
+<div class="banner toast" id="undo-toast" role="status" hidden></div>
+{% endblock %}
+{% block detail_extra %}
+<section class="audit-section"><h3 data-i18n="admin.timeline">操作时间线</h3>
+  <div class="banner" id="audit-notice" role="status" hidden></div><ol class="audit-list" id="audit-list"></ol></section>
 {% endblock %}
 {% block scripts %}
 <script defer src="{{ url_for('static', filename='js/admin.js') }}"></script>

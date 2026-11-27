@@ -45,7 +45,7 @@
     reader = new Html5Qrcode(elementId, { verbose: false });
     try {
       await reader.start({ facingMode: 'environment' }, { fps: 10 }, raw => {
-        if (held || shutdown) return;
+        if (held || shutdown || document.querySelector('dialog[open]')) return;
         const token = qrToken(raw);
         const now = Date.now();
         for (const [key, stamp] of seen) if (now - stamp >= 3000) seen.delete(key);
@@ -91,7 +91,7 @@
     return shutdown;
   }
 
-  function bind(onIdentify) {
+  function bind(onIdentify, { autoStart = true } = {}) {
     const toggle = UI.byId('camera-toggle');
     const frame = UI.byId('camera-frame');
     const form = UI.byId('manual-form');
@@ -145,7 +145,9 @@
         const raw = await fileReader.scanFile(file, false);
         await onIdentify({ token: qrToken(raw) });
       } catch (_) {
-        UI.notice('photo-notice', 'warning', () => I18N.t('scan.noPhotoQR'));
+        const message = () => I18N.t('scan.noPhotoQR');
+        UI.notice('photo-notice', 'error', message);
+        if (!held && !document.querySelector('dialog[open]')) await flash('error', message);
       } finally {
         fileReader?.clear();
         readingPhoto = false;
@@ -154,7 +156,10 @@
     });
     if (fallback) UI.showError('camera-notice', new ApiError(fallback, '', 0));
     update();
-    if (!fallback && !new URLSearchParams(location.search).has('code')) changeCamera();
+    function startCamera() {
+      if (!fallback && !running && !changing && !held) changeCamera();
+    }
+    if (autoStart) startCamera();
     form.addEventListener('submit', async event => {
       event.preventDefault();
       if (held) return;
@@ -169,6 +174,7 @@
     });
     window.addEventListener('pagehide', () => { stop().then(update).catch(() => {}); });
     return {
+      startCamera,
       hold(value) {
         if (value) pause();
         else resume();
@@ -176,5 +182,23 @@
       }
     };
   }
-  window.Scanner = { start, stop, pause, resume, bind };
+  function flash(tone, message) {
+    const dialog = UI.byId('result-overlay');
+    dialog.dataset.tone = tone;
+    UI.notice('result-message', tone, message);
+    dialog.showModal();
+    navigator.vibrate?.(tone === 'success' ? 80 : [70, 60, 70]);
+    return new Promise(resolve => {
+      const dismiss = () => { if (dialog.open) dialog.close(); };
+      const timer = setTimeout(dismiss, 2200);
+      dialog.querySelector('button').addEventListener('click', dismiss, { once: true });
+      dialog.addEventListener('close', () => {
+        clearTimeout(timer);
+        dialog.querySelector('button').removeEventListener('click', dismiss);
+        UI.notice('result-message');
+        resolve();
+      }, { once: true });
+    });
+  }
+  window.Scanner = { start, stop, pause, resume, bind, flash };
 })();

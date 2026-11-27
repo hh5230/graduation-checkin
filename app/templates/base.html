@@ -1,10 +1,18 @@
 {% from "_icons.html" import icon %}
-{% from "_ui.html" import brand, tr, languages, connection, socket_scripts, scanner_scripts, heading, stat_cards, card_head, scan_panel %}
+{% from "_ui.html" import brand, tr, languages, connection, socket_scripts, scanner_scripts, heading, stat_cards, card_head, scan_panel, result_overlay %}
 {% set workspace = current_user and page not in ['login','claim'] %}
+{% set role_pages = {
+  'admin': ['admin','entry','stage','display','dashboard'],
+  'staff': ['entry','stage','display','dashboard'],
+  'checkin': ['entry','dashboard'],
+  'stage': ['stage','display','dashboard'],
+  'viewer': ['dashboard','display']
+} %}
+{% set allowed = role_pages.get(current_user.role, []) if current_user else [] %}
 <!doctype html>
 <html lang="zh">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title data-i18n="{{ title_key|default('app.name') }}">{% block title %}GradCheck{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
@@ -17,7 +25,11 @@
   {% if workspace %}{% include "_navigation.html" %}{% endif %}
   <main id="main" class="{{ 'main-content' if workspace else 'public-layout' }}">
     <div id="global-notice" class="banner" role="alert" hidden></div>
-    {% if not workspace %}<div class="public-card panel"><header class="public-header">{{ brand() }}{{ languages() }}</header>{% endif %}
+    {% if not workspace %}<div class="public-card panel"><header class="public-header">{{ brand() }}{{ languages() }}
+      {% if page in ['login','claim'] %}
+      <div class="pass-art" aria-hidden="true"><div class="pass-back"></div><div class="pass-front">
+        {{ icon('graduation-cap') }}<i></i><b></b></div></div>
+      {% endif %}</header>{% endif %}
     {% block content %}{% endblock %}
     {% if not workspace %}</div>{% endif %}
   </main>
@@ -26,6 +38,7 @@
     <header class="dialog-head"><h2 id="detail-title" data-i18n="common.details">参与者详情</h2>
     <form method="dialog"><button class="icon-button" data-i18n-aria="common.close" aria-label="关闭">{{ icon('x') }}</button></form></header>
     <div id="detail-person"></div>
+    {% block detail_extra %}{% endblock %}
   </dialog>
   {% endif %}
   {% block scripts %}{% endblock %}

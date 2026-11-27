@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const { byId, notice, showError } = UI;
+  const { byId, notice, showError, element } = UI;
   const search = byId('search');
   const filter = byId('status-filter');
   let selectedStatus = '';
@@ -25,7 +25,8 @@
 
   function rowFor(person) {
     return UI.personRow(person, { email: true, timeField: 'checked_in_at',
-      actions: [['admin.edit', 'edit', openEditor], ['admin.qr', 'qr', openQr]] });
+      actions: [['admin.edit', 'edit', openEditor], ['admin.qr', 'qr', openQr],
+        ['admin.timeline', 'clock', openTimeline], ['admin.undo', 'undo', openUndo]] });
   }
   function render() {
     rows.textContent = '';
@@ -72,7 +73,12 @@
     previous.disabled = next.disabled = true;
     timer = setTimeout(loadList, delay);
   }
+  function updateSheetLink() {
+    byId('print-sheet').href = '/admin/qr-sheet?' + new URLSearchParams({ status: selectedStatus, q: search.value.trim() });
+  }
+  updateSheetLink();
   function refilter(delay) {
+    updateSheetLink();
     list = null;
     page = 1;
     schedule(delay);
@@ -167,18 +173,175 @@
     }
   });
   byId('print-qr').addEventListener('click', () => window.print());
+  const auditDialog = byId('participant-detail');
+  let auditPerson = null;
+  let auditEvents = [];
+  let auditVersion = 0;
+  const fieldKeys = { participant_code: 'field.code', name: 'field.name', email: 'field.email',
+    entrance: 'entry.entrance', reason: 'field.reason', from: 'audit.from', to: 'audit.to',
+    changed_fields: 'audit.fields', requeue_count: 'audit.requeues', line: 'admin.line', position: 'audit.position' };
+
+  function detailValue(key, value) {
+    if (key === 'from' || key === 'to') return I18N.t('status.' + value);
+    if (key === 'changed_fields' && Array.isArray(value)) {
+      return value.map(field => fieldKeys[field] ? I18N.t(fieldKeys[field]) : field).join(' · ');
+    }
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+  const actionIcons = { create: 'add', update: 'edit', check_in: 'check', enqueue: 'move', call: 'move',
+    complete: 'check', regenerate_qr: 'qr', requeue: 'undo', undo: 'undo', import: 'add' };
+  function renderAudit() {
+    const list = byId('audit-list');
+    list.replaceChildren();
+    for (const item of auditEvents) {
+      const row = element('li');
+      const mark = element('span', 'audit-mark');
+      mark.append(UI.icon(actionIcons[item.action] || 'clock'));
+      const summary = element('div', 'audit-entry');
+      const time = element('time', 'secondary', formatTime(item.at));
+      time.dateTime = item.at;
+      summary.append(element('strong', '', I18N.t('action.' + item.action)), time);
+      if (item.operator) summary.append(element('span', '', item.operator.name));
+      for (const [key, value] of Object.entries(item.details || {})) {
+        if (value == null) continue;
+        const label = fieldKeys[key] ? I18N.t(fieldKeys[key]) : key;
+        summary.append(element('span', 'secondary', label + ' · ' + detailValue(key, value)));
+      }
+      row.append(mark, summary);
+      list.append(row);
+    }
+  }
+  async function loadAudit() {
+    const revision = ++auditVersion;
+    const person = auditPerson;
+    if (!person || !auditDialog.open) return;
+    try {
+      const events = await API.get('/api/participants/' + person.id + '/timeline');
+      if (revision !== auditVersion || !auditDialog.open) return;
+      auditEvents = events;
+      notice('audit-notice', 'info', events.length ? null : () => I18N.t('audit.empty'));
+      renderAudit();
+    } catch (error) { if (revision === auditVersion) showError('audit-notice', error); }
+  }
+  function openTimeline(person) {
+    auditPerson = person;
+    auditEvents = [];
+    renderAudit();
+    UI.showDetails(person);
+    notice('audit-notice', 'info', () => I18N.t('common.loading'));
+    loadAudit();
+  }
+  auditDialog.addEventListener('close', () => { ++auditVersion; auditPerson = null; });
+
+  const upload = byId('import-dialog');
+  const importForm = byId('import-form');
+  let importing = false;
+  let report = null;
+  byId('csv-template').href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('participant_code,name,email\r\n');
+  function renderImport() {
+    byId('import-result').hidden = !report;
+    if (!report) return;
+    byId('import-created').textContent = report.created;
+    byId('import-skipped').textContent = report.skipped_existing;
+    const table = byId('import-errors');
+    table.hidden = !report.errors.length;
+    const body = table.tBodies[0];
+    body.replaceChildren();
+    for (const error of report.errors) {
+      const message = UI.errorText(error);
+      const cell = element('td');
+      cell.append(element('strong', '', message));
+      if (error.message && error.message !== message) cell.append(element('p', '', error.message));
+      cell.append(element('small', '', error.code));
+      const row = element('tr');
+      row.append(element('td', '', error.line), element('td', 'mono', error.participant_code || '—'), cell);
+      body.append(row);
+    }
+  }
+  byId('open-import').addEventListener('click', () => {
+    report = null;
+    importForm.reset();
+    notice('import-notice');
+    renderImport();
+    upload.showModal();
+  });
+  importForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (importing) return;
+    const data = new FormData(importForm);
+    importing = true;
+    upload.querySelectorAll('input,button').forEach(control => { control.disabled = true; });
+    notice('import-notice', 'info', () => I18N.t('common.loading'));
+    report = null;
+    renderImport();
+    try {
+      report = await API.upload('/api/participants/import', data);
+      notice('import-notice');
+      renderImport();
+      await loadList();
+    } catch (error) { showError('import-notice', error); }
+    finally {
+      importing = false;
+      upload.querySelectorAll('input,button').forEach(control => { control.disabled = false; });
+    }
+  });
+  upload.addEventListener('cancel', event => { if (importing) event.preventDefault(); });
+
+  const undo = byId('undo-dialog');
+  const undoForm = byId('undo-form');
+  let undoPerson;
+  let undoing = false;
+  let toastTimer;
+  function openUndo(person) {
+    undoPerson = person;
+    undoForm.reset();
+    byId('undo-person').textContent = person.name + ' · ' + person.participant_code;
+    notice('undo-notice');
+    undo.showModal();
+    undoForm.elements.reason.focus();
+  }
+  undoForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (undoing) return;
+    const input = undoForm.elements.reason;
+    const reason = input.value.trim();
+    if (!reason) { input.value = ''; input.reportValidity(); return; }
+    undoing = true;
+    for (const control of undoForm.elements) control.disabled = true;
+    notice('undo-notice');
+    try {
+      await API.post('/api/participants/' + undoPerson.id + '/undo', { reason });
+      const name = undoPerson.name;
+      undo.close();
+      clearTimeout(toastTimer);
+      notice('undo-toast', 'success', () => I18N.t('admin.undone', { name }));
+      toastTimer = setTimeout(() => notice('undo-toast'), 4000);
+      await loadList();
+    } catch (error) { showError('undo-notice', error); }
+    finally {
+      undoing = false;
+      for (const control of undoForm.elements) control.disabled = false;
+    }
+  });
+  undo.addEventListener('cancel', event => { if (undoing) event.preventDefault(); });
   document.querySelectorAll('[data-close]').forEach(button => {
     button.addEventListener('click', () => button.closest('dialog').close());
   });
   editor.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
   qr.addEventListener('cancel', event => { if (regenerating) event.preventDefault(); });
-  window.addEventListener('langchange', render);
+  window.addEventListener('langchange', () => { render(); renderImport(); renderAudit(); });
   loadList();
   Realtime.connect({
-    onConnect: loadList,
+    onConnect: () => { loadList(); loadAudit(); },
+    onStats: () => schedule(180),
     onParticipant: ({ action, participant }) => {
       if (qr.open && qrPerson.id === participant.id && ['update', 'regenerate_qr'].includes(action)) {
         setPass(participant);
+      }
+      if (auditDialog.open && auditPerson?.id === participant.id) {
+        auditPerson = participant;
+        UI.showDetails(participant);
+        loadAudit();
       }
       schedule(180);
     }

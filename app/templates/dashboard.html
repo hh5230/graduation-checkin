@@ -5,25 +5,25 @@
 {% block content %}
 {{ heading(page, '数据总览') }}
 {{ stat_cards(['total', 'checked_in', 'not_checked_in', 'waiting', 'on_stage', 'completed']) }}
-<div class="dashboard-grid">
+<section class="panel rate-panel"><label for="checkin-rate" data-i18n="stats.rate">签到率</label>
+  <strong data-rate>—</strong><progress id="checkin-rate" max="1"></progress></section>
+<div class="dashboard-grid{{ ' chart-only' if 'display' not in allowed }}">
   <section class="panel chart-panel"><header class="card-head"><h2>{{ icon('chart-column') }}{{ tr('dashboard.chart','签到趋势') }}</h2>
-    <select id="chart-interval" data-i18n-aria="dashboard.interval" aria-label="统计间隔">
-      {% for minutes in [15, 30, 60] %}<option value="{{ minutes }}" data-i18n="dashboard.minutes{{ minutes }}"{% if minutes == 30 %} selected{% endif %}>{{ minutes }} 分钟</option>{% endfor %}
-    </select></header>
+    <span class="secondary" data-i18n="dashboard.interval10">每 10 分钟</span></header>
     <div class="chart-body"><div class="chart-summary"><strong id="chart-total">—</strong><span data-i18n="dashboard.windowCount">时段内签到人数</span></div>
       <div class="banner" id="timeline-notice" role="alert" hidden></div><div id="timeline" class="chart"></div>
       <div class="chart-key"><span data-i18n="dashboard.previous">历史时段</span><span data-i18n="dashboard.current">当前时段</span></div>
     </div>
   </section>
-  <div class="panel-stack stage-summary">
+  {% if 'display' in allowed %}<div class="panel-stack stage-summary">
     <section class="panel">{{ card_head('mic','display.now','正在上台','/display','nav.display') }}
       <ul class="person-list" id="dash-current"></ul></section>
-    <section class="panel">{{ card_head('list-ordered','stage.queue','等候队列','/stage') }}
+    <section class="panel">{{ card_head('list-ordered','stage.queue','等候队列','/stage' if 'stage' in allowed else '') }}
       <ol class="person-list" id="dash-queue"></ol></section>
-  </div>
+  </div>{% endif %}
 </div>
 <div class="banner" id="state-notice" role="alert" hidden></div>
-<section class="panel">{{ card_head('user-check','dashboard.recent','最近签到','/admin' if current_user.role == 'admin' else '/entry','nav.admin' if current_user.role == 'admin' else 'nav.entry') }}
+<section class="panel">{{ card_head('user-check','dashboard.recent','最近签到','/admin' if current_user.role == 'admin' else '/entry' if 'entry' in allowed else '', 'nav.admin' if current_user.role == 'admin' else 'nav.entry') }}
   <div class="banner" id="recent-notice" role="alert" hidden></div><ul class="person-list" id="dash-recent"></ul></section>
 <p class="updated">{{ tr('stats.updated', '最后更新') }} <time id="stats-time">—</time></p>
 {% endblock %}

@@ -2,66 +2,88 @@
   'use strict';
 
   const { byId, element, notice, personList } = UI;
-  const call = byId('call-next');
-  const complete = byId('complete');
-  const advance = byId('complete-next');
+  const sheet = byId('requeue-sheet');
   let state = null;
   let busy = false;
+  let absent = null;
   const scanner = Scanner.bind(source => operate('/api/stage/queue', source, 'stage.enqueued'));
 
   function controls() {
-    const current = state && state.current;
-    const waiting = state && state.queue.length;
-    call.disabled = busy || !waiting || Boolean(current);
-    complete.disabled = busy || !current;
-    advance.disabled = busy || !current || !waiting;
+    const locked = busy || sheet.open;
+    const waiting = state?.queue_length ?? state?.queue.length;
+    byId('call-next').disabled = locked || !waiting || Boolean(state?.current);
+    byId('complete').disabled = byId('requeue').disabled = locked || !state?.current;
+    scanner.hold(locked);
+  }
+  function hero(id, person, empty) {
+    const card = byId(id);
+    card.replaceChildren(element('strong', person ? 'hero-name' : 'hero-idle',
+      person ? person.name : I18N.t(state ? empty : 'common.loading')));
+    if (person) card.append(element('span', 'feature-code', person.participant_code));
   }
   function render() {
     controls();
-    const card = byId('stage-current');
-    card.textContent = '';
-    if (!state) {
-      card.append(element('li', 'empty', I18N.t('common.loading')));
-      return;
-    }
-    personList(card, state.current ? [state.current] : [], 'called_at', 'stage.idle');
-    personList(byId('stage-queue'), state.queue, 'queued_at', 'stage.emptyQueue', true);
+    hero('stage-current', state?.current, 'stage.idle');
+    hero('stage-next', state && ('next' in state ? state.next : state.queue[0]), 'stage.emptyQueue');
+    if (absent) byId('requeue-question').textContent = I18N.t('stage.requeueQuestion', { name: absent.name });
+    if (!state) return;
+    byId('stage-length').textContent = I18N.t('stage.length', { count: state.queue_length ?? state.queue.length });
+    const roster = byId('stage-queue');
+    roster.replaceChildren();
+    if (!state.queue.length) roster.append(element('li', 'empty', I18N.t('stage.emptyQueue')));
+    state.queue.forEach((person, index) => {
+      const row = UI.personRow(person, { position: index + 1, actions: [] });
+      const who = row.querySelector('.person-who');
+      const time = element('time', 'secondary', formatTime(person.queued_at));
+      time.dateTime = person.queued_at;
+      who.append(time);
+      if (person.requeue_count > 0) who.append(element('span', 'requeue-count',
+        I18N.t('stage.requeueCount', { count: person.requeue_count })));
+      roster.append(row);
+    });
     personList(byId('stage-recent'), state.recent_completed, 'completed_at', 'stage.emptyRecent');
   }
   const feed = Realtime.snapshot('/api/stage/state', data => { state = data; render(); });
-
-  async function operate(path, body, messageKey) {
-    if (busy) return false;
+  async function operate(path, body, key, target) {
+    if (busy || sheet.open) return false;
+    const hadQueue = (state?.queue_length ?? state?.queue.length ?? 0) > 0;
     busy = true;
-    scanner.hold(true);
     controls();
-    notice('stage-notice');
+    let success = false;
+    let tone, message;
     try {
       const result = await API.post(path, body);
-      const person = result.participant || result.current || result.completed;
-      notice('stage-notice', 'success', () => I18N.t(messageKey, { name: person.name, position: result.position }));
-      return true;
+      const person = result.participant || result.current || result.completed || target;
+      message = () => I18N.t(key, { name: person.name, position: result.position });
+      tone = 'success';
+      success = true;
     } catch (error) {
-      notice('stage-notice', error.code === 'ALREADY_QUEUED' ? 'warning' : 'error', () => {
-        const message = UI.errorText(error);
-        if (error.code === 'ALREADY_QUEUED' && error.details.position) {
-          return message + ' ' + I18N.t('stage.position', { position: error.details.position });
-        }
-        return message;
-      });
-      return false;
-    } finally {
-      await feed.refresh();
-      busy = false;
-      scanner.hold(false);
-      controls();
+      tone = ['ALREADY_QUEUED', 'STAGE_BUSY', 'NOTHING_ON_STAGE', 'QUEUE_EMPTY'].includes(error.code) ? 'warning' : 'error';
+      message = () => error.code === 'QUEUE_EMPTY' && hadQueue
+        ? UI.errorText(error) + '\n' + I18N.t('feedback.colleague') : UI.errorText(error);
     }
+    try {
+      notice('stage-notice', tone, message);
+      await Promise.all([Scanner.flash(tone, message), feed.refresh()]);
+    } finally { busy = false; controls(); }
+    return success;
   }
-  call.addEventListener('click', () => operate('/api/stage/call-next', {}, 'stage.called'));
-  complete.addEventListener('click', () => {
-    if (state && state.current) operate('/api/stage/complete', { participant_id: state.current.id }, 'stage.finished');
+  byId('call-next').addEventListener('click', () => operate('/api/stage/call-next', {}, 'stage.called'));
+  byId('complete').addEventListener('click', () => {
+    if (state?.current) operate('/api/stage/complete', { participant_id: state.current.id }, 'stage.finished');
   });
-  advance.addEventListener('click', () => operate('/api/stage/call-next', { complete_current: true }, 'stage.called'));
+  byId('requeue').addEventListener('click', () => {
+    absent = state.current;
+    sheet.returnValue = '';
+    sheet.showModal();
+    render();
+  });
+  sheet.addEventListener('close', () => {
+    const target = absent;
+    absent = null;
+    if (sheet.returnValue === 'move') operate('/api/stage/requeue', { participant_id: target.id }, 'stage.requeued', target);
+    else controls();
+  });
   window.addEventListener('langchange', render);
   render();
   feed.refresh();

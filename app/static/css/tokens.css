@@ -16,20 +16,20 @@
   --color-on-primary:     #FFFFFF;
 
   /* ---- Surfaces & text ---- */
-  --color-bg:             #F5F4F9;   /* page background: pale purple-gray */
+  --color-bg:             #F6F5F8;   /* page background: pale purple-gray */
   --color-surface:        #FFFFFF;   /* cards, sidebar, top bar */
   --color-surface-muted:  #F7F6FA;   /* search box, inputs at rest */
   --color-border:         #ECE9F1;   /* 1px card border */
   --color-border-strong:  #DCD7E3;   /* inputs, dividers */
   --color-text:           #2B2433;   /* body / headings */
   --color-text-secondary: #6E6878;
-  --color-text-muted:     #9A94A3;   /* captions, placeholders */
+  --color-text-muted:     #736C7B;   /* captions, placeholders */
 
   /* ---- Feedback (light bg + dark text) ---- */
   --color-success-bg:     #E4F5EC;
-  --color-success-text:   #1E7A4C;
+  --color-success-text:   #17693F;
   --color-warning-bg:     #FDEEDD;
-  --color-warning-text:   #B4561B;
+  --color-warning-text:   #98450F;
   --color-danger-bg:      #FDE4E6;
   --color-danger-text:    #C02E3B;
   --color-info-bg:        var(--color-primary-100);
@@ -38,13 +38,13 @@
   /* ---- Participant status chips (fixed mapping) ---- */
   --status-registered-bg:   #EFEEF2;  --status-registered-text:   #5F5A67;  /* 未签到 gray */
   --status-checked_in-bg:   #F1E4F7;  --status-checked_in-text:   #7A3B8A;  /* 已签到 purple */
-  --status-queued-bg:       #FDEEDD;  --status-queued-text:       #B4561B;  /* 排队中 orange */
+  --status-queued-bg:       #FDEEDD;  --status-queued-text:       #98450F;  /* 排队中 orange */
   --status-on_stage-bg:     #4A1D4F;  --status-on_stage-text:     #FFFFFF;  /* 上台中 deep purple */
-  --status-completed-bg:    #E4F5EC;  --status-completed-text:    #1E7A4C;  /* 已完成 green */
+  --status-completed-bg:    #E4F5EC;  --status-completed-text:    #17693F;  /* 已完成 green */
 
   /* ---- Radius ---- */
-  --radius-card:   14px;   /* cards 12–16 */
-  --radius-lg:     16px;
+  --radius-card:   18px;   /* cards 12–16 */
+  --radius-lg:     24px;
   --radius-control: 10px;  /* buttons, inputs 8–10 */
   --radius-sm:     8px;
   --radius-pill:   999px;  /* chips, badges, segments */
@@ -59,7 +59,7 @@
                "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --fs-xs: 12px;  --fs-sm: 13px;  --fs-md: 14px;  --fs-lg: 16px;
-  --fs-xl: 20px;  --fs-2xl: 24px; --fs-3xl: 30px; --fs-stat: 28px;
+  --fs-xl: 20px;  --fs-2xl: 24px; --fs-3xl: 30px; --fs-stat: 36px;
   --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
   --lh-tight: 1.2; --lh-normal: 1.5;
 
@@ -69,7 +69,7 @@
 
   /* ---- Layout ---- */
   --sidebar-width: 232px;
-  --topbar-height: 64px;
+  --topbar-height: 72px;
   --control-height: 40px;
   --touch-target: 48px;    /* mobile scan pages: large one-hand buttons */
   --content-max: 1280px;
@@ -85,4 +85,15 @@
   --display-accent: #D3B8E6;
   --display-text:   #FFFFFF;
   --display-muted:  #B9A8C2;
+
+  --font-ceremony: Georgia, "Songti SC", "STSong", "SimSun", serif;
+  --ink-plum: #341039;
+  --ink-orchid: #79457F;
+  --foil: #EBD1A6;
+  --engraving: color-mix(in srgb, var(--foil) 19%, transparent);
+  --ceremony-lines: repeating-radial-gradient(ellipse at 108% 135%, transparent 0 12px, var(--engraving) 13px, transparent 14px 19px);
+  --ceremony-ground: linear-gradient(115deg, var(--ink-plum), var(--color-primary) 58%, var(--ink-orchid));
+  --tint-blue-bg: #E6EDF8;
+  --tint-blue-ink: #344F77;
+  --shadow-raised: 0 16px 48px -24px rgba(55, 23, 61, .28), 0 3px 9px rgba(55, 23, 61, .05);
 }

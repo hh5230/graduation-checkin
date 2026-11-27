@@ -9,7 +9,8 @@
   let stored;
   try { stored = localStorage.getItem('lang'); } catch (_) { /* Storage may be disabled. */ }
   const cookie = document.cookie.match(/(?:^|;\s*)lang=([^;]*)/);
-  let language = supported(stored) || supported(cookie && cookie[1]) || supported(navigator.language) || 'zh';
+  const queryLang = location.pathname === '/display' && new URLSearchParams(location.search).get('lang');
+  let language = (['en', 'zh'].includes(queryLang) && queryLang) || supported(stored) || supported(cookie && cookie[1]) || supported(navigator.language) || 'zh';
   let dictionary = Object.create(null);
   const cache = new Map();
   let revision = 0;

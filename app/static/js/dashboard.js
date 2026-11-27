@@ -3,7 +3,7 @@
 
   const { byId, element, personList } = UI;
   const admin = document.body.dataset.role === 'admin';
-  const interval = byId('chart-interval');
+  const hasStage = Boolean(byId('dash-current'));
   let timeline = null;
   let stage = null;
   let recent = [];
@@ -51,7 +51,7 @@
     clearTimeout(timer);
     const version = ++timelineVersion;
     try {
-      const data = await API.get('/api/stats/timeline', { bucket_minutes: interval.value, buckets: 8 });
+      const data = await API.get('/api/stats/timeline', { bucket_minutes: 10, buckets: 12 });
       if (version !== timelineVersion) return;
       timeline = data;
       UI.notice('timeline-notice');
@@ -68,7 +68,12 @@
   function remember(people) {
     const byPerson = new Map(recent.map(person => [person.id, person]));
     for (const person of people) {
-      if (!person?.checked_in_at) continue;
+      if (!person) continue;
+      if (!person.checked_in_at) {
+        const previous = byPerson.get(person.id);
+        if (previous && previous.updated_at <= person.updated_at) byPerson.delete(person.id);
+        continue;
+      }
       const previous = byPerson.get(person.id);
       if (!previous || previous.updated_at <= person.updated_at) byPerson.set(person.id, person);
     }
@@ -105,12 +110,11 @@
       if (version === rosterVersion) UI.showError('recent-notice', error);
     }
   }
-  function refresh() { stageFeed.refresh(); fetchChart(); loadRoster(); }
-  interval.addEventListener('change', fetchChart);
+  function refresh() { if (hasStage) stageFeed.refresh(); fetchChart(); loadRoster(); }
   window.addEventListener('langchange', () => { renderChart(); renderStage(); renderRecent(); });
   setInterval(fetchChart, 60000);
   Realtime.connect({
-    onStage: stageFeed.accept, onConnect: refresh,
+    onStage: hasStage ? stageFeed.accept : undefined, onConnect: refresh,
     onStats: () => { clearTimeout(timer); timer = setTimeout(fetchChart, 300); },
     onParticipant: ({ action, participant }) => {
       if (action === 'check_in' || recent.some(p => p.id === participant.id)) remember([participant]);

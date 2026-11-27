@@ -4,21 +4,34 @@
 {% block title %}舞台调度{% endblock %}
 {% block content %}
 {{ heading(page, '舞台调度') }}
-<div class="banner" id="stage-notice" role="status" hidden></div><div class="banner" id="state-notice" role="alert" hidden></div>
-<div class="counter-grid">
-  {{ scan_panel('stage.enqueue', '加入队列') }}
-  <div class="panel-stack">
-    <section class="panel">{{ card_head('mic','stage.current','当前上台者','/display','nav.display') }}
-      <ul class="person-list" id="stage-current" aria-live="polite"></ul>
-      <div class="actions counter-actions">
-        <button class="button primary" id="call-next" disabled data-i18n="stage.call">呼叫下一位</button>
-        <button class="button" id="complete" disabled data-i18n="stage.complete">完成上台</button>
-        <button class="button" id="complete-next" disabled data-i18n="stage.advance">完成并呼叫下一位</button>
-      </div></section>
-    <section class="panel">{{ card_head('list-ordered','stage.queue','等候队列') }}<ol class="person-list" id="stage-queue"></ol></section>
-    <section class="panel">{{ card_head('circle-check','stage.recent','最近完成') }}<ol class="person-list" id="stage-recent"></ol></section>
-  </div>
+<div class="banner" id="state-notice" role="alert" hidden></div>
+<div class="stage-lineup">
+  <section class="panel spotlight">{{ card_head('mic','display.now','正在上台','/display','nav.display') }}
+    <div class="hero-identity" id="stage-current" aria-live="polite"></div></section>
+  <section class="panel">{{ card_head('list-ordered','display.next','下一位') }}
+    <div class="hero-identity" id="stage-next"></div></section>
 </div>
+<div class="banner" id="stage-notice" role="status" hidden></div>
+<div class="counter-grid">
+  <section class="panel"><header class="card-head"><h2>{{ icon('list-ordered') }}{{ tr('stage.queue','等候队列') }}</h2>
+    <strong id="stage-length" class="queue-length" aria-live="polite">—</strong></header>
+    <ol class="person-list" id="stage-queue"></ol></section>
+  <div class="panel-stack">{{ scan_panel('stage.enqueue', '加入队列') }}
+    <section class="panel">{{ card_head('circle-check','stage.recent','最近完成') }}<ol class="person-list" id="stage-recent"></ol></section></div>
+</div>
+<div class="thumb-bar stage-controls">
+  <button class="button primary" id="call-next" disabled>{{ icon('mic') }}{{ tr('stage.call','呼叫下一位') }}</button>
+  <button class="button primary" id="complete" disabled>{{ icon('circle-check') }}{{ tr('stage.complete','完成上台') }}</button>
+  <button class="text-button" id="requeue" disabled data-i18n="stage.requeue">不在场，放回队尾</button>
+</div>
+<dialog id="requeue-sheet" class="confirm-sheet" aria-labelledby="requeue-title">
+  <form method="dialog" class="form-stack">
+    <h2 id="requeue-title" data-i18n="stage.requeue">不在场，放回队尾</h2><p id="requeue-question"></p>
+    <div class="actions"><button class="button" value="cancel" autofocus data-i18n="common.cancel">取消</button>
+    <button class="button primary" value="move" data-i18n="stage.confirmRequeue">确认放回队尾</button></div>
+  </form>
+</dialog>
+{{ result_overlay() }}
 {% endblock %}
 {% block scripts %}{{ scanner_scripts() }}
 <script defer src="{{ url_for('static', filename='js/stage.js') }}"></script>{% endblock %}

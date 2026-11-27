@@ -1,14 +1,14 @@
-{% set nav = [('dashboard','layout-dashboard','数据总览',''),('admin','users','参与者管理','total'),('entry','scan-line','入场签到','not_checked_in'),('stage','mic','舞台调度','waiting'),('display','monitor','舞台大屏','')] %}
 {% macro nav_link(slug, glyph, label, count='', compact=false) -%}
 <a class="nav-item" href="/{{ slug }}"{% if page == slug %} aria-current="page"{% endif %}>{{ icon(glyph) }}{{ tr(('tab.' if compact else 'nav.') ~ slug, label) }}
 {% if count %}<span class="nav-count" data-stat="{{ count }}">—</span>{% endif %}</a>
 {%- endmacro %}
+{% set nav = {'admin':('users','参与者管理','total'), 'entry':('scan-line','入场签到','not_checked_in'),
+  'stage':('mic','舞台调度','waiting'), 'display':('monitor','舞台大屏',''), 'dashboard':('layout-dashboard','数据总览','')} %}
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">{{ brand() }}<button id="close-drawer" class="icon-button mobile-only" data-i18n-aria="common.close" aria-label="关闭">{{ icon('x') }}</button></div>
   <nav class="side-nav" data-i18n-aria="nav.label" aria-label="主导航">
-    {% for slug, glyph, label, count in nav if slug != 'admin' or current_user.role == 'admin' %}
-    {{ nav_link(slug, glyph, label, count) }}{% endfor %}
-    <div class="nav-divider"></div>{{ nav_link('claim','qr-code','领取二维码') }}
+    {% for slug in allowed %}{{ nav_link(slug, *nav[slug]) }}{% endfor %}
+    <div class="nav-divider"></div>
     <button type="button" class="nav-item" id="logout">{{ icon('log-out') }}{{ tr('auth.logout', '退出登录') }}</button>
   </nav>
   <div class="sidebar-foot">{{ connection() }}</div>
@@ -16,12 +16,13 @@
 <button type="button" class="scrim" id="scrim" tabindex="-1" aria-hidden="true" hidden></button>
 <header class="topbar">
   <button class="icon-button mobile-only" id="hamburger" aria-controls="sidebar" aria-expanded="false" data-i18n-aria="nav.label" aria-label="主导航">{{ icon('menu') }}</button>
+  {% if 'entry' in allowed %}
   <button class="icon-button mobile-only" id="search-toggle" aria-controls="global-search" aria-expanded="false" data-i18n-aria="shell.search" aria-label="搜索">{{ icon('search') }}</button>
   <form class="global-search" id="global-search" role="search" action="{{ '/admin' if current_user.role == 'admin' else '/entry' }}">
     {{ icon('search') }}
-    <input type="search" name="{{ 'q' if current_user.role == 'admin' else 'code' }}" required data-i18n-aria="shell.search" aria-label="搜索" data-i18n-placeholder="{{ 'admin.searchHint' if current_user.role == 'admin' else 'shell.searchCode' }}" placeholder="搜索参与者">
+    <input type="search" name="q" required data-i18n-aria="shell.search" aria-label="搜索" data-i18n-placeholder="admin.searchHint" placeholder="搜索参与者">
     <kbd id="shortcut">Ctrl K</kbd>
-  </form>
+  </form>{% endif %}
   <div class="header-tools"><div class="notification">
     <button class="icon-button" id="bell" aria-controls="notifications" aria-expanded="false" data-i18n-aria="shell.notifications" aria-label="通知">{{ icon('bell') }}<i id="bell-dot" hidden></i></button>
     <div class="pop-panel" id="notifications" hidden><strong data-i18n="shell.notifications">通知</strong><ul id="updates"></ul></div>
@@ -30,9 +31,5 @@
   </div>{{ languages() }}</div>
 </header>
 <nav class="bottom-nav" data-i18n-aria="nav.label" aria-label="主导航">
-{% for slug, glyph, label, count in nav if slug in ['dashboard','entry','stage'] %}
-{{ nav_link(slug, glyph, label, compact=true) }}
-{% endfor %}
-{% if current_user.role == 'admin' %}{{ nav_link('admin','users','管理',compact=true) }}
-{% else %}{{ nav_link('display','monitor','大屏',compact=true) }}{% endif %}
+{% for slug in allowed %}{{ nav_link(slug, nav[slug][0], nav[slug][1], compact=true) }}{% endfor %}
 </nav>

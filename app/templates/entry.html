@@ -3,23 +3,43 @@
 {% set title_key = 'nav.entry' %}
 {% block title %}入场签到{% endblock %}
 {% block content %}
-{{ heading(page, '入场签到') }}
-<div class="banner" id="entry-notice" role="status" hidden></div>
-<div class="counter-grid">
+<header class="page-heading"><div><h1 data-i18n="nav.entry">入场签到</h1>
+  <p data-i18n="entry.subtitle"></p></div>
+  <button class="button" id="change-entrance">{{ icon('edit') }}{{ tr('entry.entrance','签到入口') }} <strong id="entrance-name"></strong></button>
+</header>
+<div class="counter-grid" id="entry-workspace">
   {{ scan_panel('entry.lookup', '查找参与者') }}
   <div class="panel-stack">
-    <section id="confirmation" class="panel confirmation" hidden aria-labelledby="confirm-title">
-      {{ card_head('user-check', 'entry.review', '核对参与者资料', target_id='confirm-title') }}
-      <div id="entry-person" class="panel-pad"></div>
-      <div class="actions counter-actions" id="confirmation-actions" hidden>
-        <button class="button" id="cancel-checkin" data-i18n="common.cancel">取消</button>
-        <button class="button primary" id="confirm-checkin" data-i18n="entry.confirm">确认签到</button>
+    <details class="panel search-panel" id="no-qr">
+      <summary>{{ icon('search') }}{{ tr('entry.noQr','没有二维码？') }}</summary>
+      <div class="panel-pad"><label class="form-stack" for="entry-search">{{ tr('admin.search','搜索参与者') }}
+        <input type="search" id="entry-search" autocomplete="off" data-i18n-placeholder="admin.searchHint" placeholder="姓名、邮箱或编号"></label>
+        <div id="search-notice" class="banner" role="status" hidden></div>
+        <ul id="search-results" class="search-results" aria-live="polite"></ul>
       </div>
-    </section>
+    </details>
     <section class="panel">{{ card_head('clock','entry.recent','本次最近签到') }}
-      <ol class="person-list" id="recent-checkins" data-user="{{ current_user.id }}"></ol></section>
+      <ol class="person-list" id="recent-checkins"></ol></section>
   </div>
 </div>
+<section id="confirmation" class="panel confirmation" hidden aria-labelledby="confirm-title">
+  <header class="card-head"><h2 id="confirm-title">{{ icon('user-check') }}{{ tr('entry.review','核对参与者资料') }}</h2>
+    <button class="text-button" id="cancel-checkin" data-i18n="common.cancel">取消</button></header>
+  <div id="entry-person" class="hero-identity"></div>
+  <div class="thumb-bar"><button class="button primary" id="confirm-checkin">{{ icon('user-check') }}{{ tr('entry.confirm','确认签到') }}</button></div>
+</section>
+<dialog id="entrance-dialog" aria-labelledby="entrance-title">
+  <form id="entrance-form" class="form-stack"><h2 id="entrance-title" data-i18n="entry.chooseEntrance">选择本机签到入口</h2>
+    <div class="actions">
+    {% for value, key in [('东门 / East','east'),('西门 / West','west'),('主入口 / Main','main')] %}
+      <button class="button" type="button" data-entrance="{{ value }}" data-i18n="entrance.{{ key }}">{{ value }}</button>
+    {% endfor %}</div>
+    <label>{{ tr('entry.customEntrance','自定义入口名称') }}<input id="custom-entrance" maxlength="64" required></label>
+    <div class="actions"><button class="button primary" type="submit" data-i18n="common.save">保存</button>
+    <button class="text-button" id="cancel-entrance" type="button" data-i18n="common.cancel">取消</button></div>
+  </form>
+</dialog>
+{{ result_overlay() }}
 {% endblock %}
 {% block scripts %}{{ scanner_scripts() }}
 <script defer src="{{ url_for('static', filename='js/entry.js') }}"></script>{% endblock %}

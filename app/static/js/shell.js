@@ -8,7 +8,7 @@
   const scrim = byId('scrim');
   const mobile = matchMedia('(max-width: 768px)');
   const form = byId('global-search');
-  const search = form.querySelector('input');
+  const search = form?.querySelector('input');
   const searchToggle = byId('search-toggle');
   const bell = byId('bell');
   const storageKey = 'graduation.notifications.' + body.dataset.user;
@@ -46,23 +46,24 @@
   setDrawer(false);
 
   function setSearch(open) {
+    if (!form) return;
     form.classList.toggle('expanded', open);
     searchToggle.setAttribute('aria-expanded', String(open));
     if (open) search.focus();
   }
-  searchToggle.addEventListener('click', () => setSearch(true));
-  form.addEventListener('focusout', event => {
+  searchToggle?.addEventListener('click', () => setSearch(true));
+  form?.addEventListener('focusout', event => {
     if (!form.contains(event.relatedTarget)) setSearch(false);
   });
-  byId('shortcut').textContent = /mac|iphone|ipad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+  if (form) byId('shortcut').textContent = /mac|iphone|ipad/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
   document.addEventListener('keydown', event => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    if (form && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       if (!document.querySelector('dialog[open]')) setSearch(true);
     }
     if (event.key === 'Escape') {
       if (body.classList.contains('drawer-open')) closeDrawer();
-      if (mobile.matches && form.classList.contains('expanded')) {
+      if (mobile.matches && form?.classList.contains('expanded')) {
         setSearch(false);
         searchToggle.focus();
       }
@@ -126,6 +127,8 @@
       node.textContent = new Intl.NumberFormat(I18N.getLang(), { style: 'percent', maximumFractionDigits: 1 })
         .format(stats.total ? stats.checked_in / stats.total : 0);
     });
+    const progress = byId('checkin-rate');
+    if (progress) progress.value = stats.total ? stats.checked_in / stats.total : 0;
     const stamp = byId('stats-time');
     if (stamp) { stamp.dateTime = statsAt; stamp.textContent = formatTime(statsAt); }
   }

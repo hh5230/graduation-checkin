@@ -29,7 +29,7 @@
 {% set icons = {'total':'users', 'checked_in':'user-check', 'not_checked_in':'clock', 'waiting':'list-ordered', 'on_stage':'mic', 'completed':'circle-check'} %}
 <div class="stats-grid" style="--columns: {{ fields|length }}">
   {% for field in fields %}
-  <section class="panel stat-card">
+  <section class="panel stat-card" data-metric="{{ field }}">
     <span class="icon-tile">{{ icon(icons[field]) }}</span><div class="stat-values">
       <div class="stat-figure"><strong data-stat="{{ field }}">—</strong>
       {% if field == 'checked_in' %}<span class="rate-chip" data-i18n-title="stats.rate">{{ icon('trending-up') }}<span data-rate>—</span></span>{% endif %}</div>
@@ -65,4 +65,13 @@
     </form>
   </div>
 </section>
+{%- endmacro %}
+
+{% macro result_overlay() -%}
+<dialog class="result-overlay" id="result-overlay" aria-labelledby="result-message">
+  <button class="result-surface" type="button" autofocus>
+    <span class="result-mark" aria-hidden="true">{{ icon('circle-check') }}{{ icon('info') }}{{ icon('x') }}</span>
+    <strong id="result-message" role="status"></strong>{{ tr('feedback.dismiss','轻触返回') }}
+  </button>
+</dialog>
 {%- endmacro %}

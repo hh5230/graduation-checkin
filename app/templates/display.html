@@ -1,9 +1,9 @@
-{% from "_ui.html" import languages, socket_scripts, connection, brand %}
+{% from "_icons.html" import icon %}
+{% from "_ui.html" import socket_scripts, tr %}
 <!doctype html>
 <html lang="zh">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="nav.display">舞台大屏</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
@@ -14,23 +14,14 @@
 </head>
 <body class="display-body">
   <main class="display-layout">
-    <header class="display-header">
-      {{ brand() }}
-      <div class="display-tools" id="display-tools">
-        {{ languages() }}
-        <button class="button" id="fullscreen" data-i18n="display.fullscreen">全屏</button>
-      </div>
-    </header>
+    <header class="display-header"><span class="brand"><span class="brand-mark">{{ icon('graduation-cap') }}</span>{{ tr('app.name','GradCheck') }}</span>
+      <span class="offline-dot" id="conn-status" role="status" data-i18n-title="connection.offline"><span class="visually-hidden" data-i18n="connection.offline">离线</span></span></header>
     <div class="banner" role="alert" id="state-notice" hidden></div>
     <div class="banner" role="status" id="display-notice" hidden></div>
     <section class="display-hero" aria-live="polite" aria-atomic="true">
-      <div class="display-label"><i aria-hidden="true"></i><span data-i18n="display.now">正在上台</span></div>
-      <div id="display-person"><h1 id="display-name" data-i18n="common.loading">正在加载…</h1><p id="display-code"></p></div>
+      <div id="display-person"><div class="display-label" id="display-label" hidden data-i18n="display.now">正在上台</div>
+      <h1 id="display-name" data-i18n="display.idle">准备中</h1><p id="display-code"></p></div>
     </section>
-    <section class="display-queue">
-      <div class="display-queue-heading"><h2 data-i18n="display.next">即将上台</h2>{{ connection() }}</div>
-      <ol id="display-queue"></ol>
-    </section>
+    <footer class="display-queue" aria-live="polite"><span data-i18n="display.nextLabel">下一位：</span> <strong id="display-next">—</strong></footer>
   </main>
-</body>
-</html>
+</body></html>

@@ -28,11 +28,7 @@
       result.hidden = false;
       byId('claim-name').focus();
     } catch (error) {
-      UI.notice('claim-notice', 'error', () => {
-        const seconds = error.details?.retry_after;
-        return error.code === 'RATE_LIMITED' && Number.isFinite(seconds)
-          ? I18N.t('claim.retry', { seconds }) : UI.errorText(error);
-      });
+      UI.showError('claim-notice', error);
     } finally { submit.disabled = false; }
   });
   byId('claim-again').addEventListener('click', () => {
